@@ -177,7 +177,7 @@ draft acceptance can change speed even when the input is identical.
 
 At temperature 0.7 a prompt's text can differ between two runs of one build, and a different text is a different amount
 of work (acceptance, expert set): the same arm measured 121.2, 118.3 and 112.9 tok/s in three batches (RTX 3090, 12 cold
-prompts, median). `STRATA_DETERMINISTIC=1` fixes the decisions that come from the clock or a measurement (see
+prompts, median; `bench/results/2026-10-12-rtx3090-opt/README.md`). `STRATA_DETERMINISTIC=1` fixes the decisions that come from the clock or a measurement (see
 [DETAILS.md](DETAILS.md), "Run-to-run determinism"), so greedy text is the same in every fresh engine, and speed can be
 compared on identical tokens. [`tools/strata_ab_linux.py`](../tools/strata_ab_linux.py) runs it (it starts engines: use
 it only when the GPU is free). It has not been run yet on the 3090 PC: the first run is the check that the pins hold.
@@ -201,6 +201,11 @@ python tools/strata_ab_linux.py speed  --cache-slots N --prefill-chunk M --round
   completion token count.
 - Deterministic mode keeps the adaptive tier (it is driven by the window count in the arena mode) but drops lookup drafts
   and the PCIe probe, so its absolute speed is not the default's: compare arms with each other only.
+- **Stop the live server first.** One engine needs about 52 GB of RAM and most of the GPU; two do not fit in 62 GiB. The script
+  refuses to start an engine below `--min-free-ram-gb` (default 50) of MemAvailable or when the free VRAM is far below what
+  `probe` saw, and stops with an error if a process it started cannot be stopped.
+- It starts from your run config but drops the server features that write files, unload the model or open the network
+  (`api_key`, `host`, `parallel`, `idle_unload_s`, `lazy_load`, `slot_save_path`, `expert_profile_save`, `before_load`, ...).
 - The script uses port 18080 (not a live server's 8080), waits for the port to be free (with a time limit) and stops only the
   process group it started. Do not run it while another engine holds the GPU: the expert cache is sized from the free VRAM.
 

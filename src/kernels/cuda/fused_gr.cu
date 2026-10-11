@@ -886,6 +886,82 @@ __global__ void __launch_bounds__(NT) gr_down_staged_kernel(GrMulti m) {
     }
 }
 
+#if !defined(__HIPCC__)
+// STRATA_GR_SM86=1 (opt-in, sm_80+): gr_down_staged_kernel with the warp's whole weight row requested up front.  The staged kernel
+// keeps one tile of weights ahead (5 uint4 a lane, a DRAM latency per tile of the 8, with two barriers between): ~20 KB a block in
+// flight.  Here a lane issues all 40 of its 16-byte loads of the row (lane + 32 i, i < 40: the staged kernel's chunks, tile h
+// chunk q = i = 5 h + q) before the first activation tile lands, so the latency is paid once and 128 B-aligned warp
+// loads of 512 B stream the row; the tiles then run from registers.  The activation tiles, their cp.async staging, the lane's
+// chunk order and the fmaf order are the staged kernel's, so every sum is bitwise the staged (and the plain) read's.
+// 128 threads (80 + 1 blocks, the inject rows in the last).  Needs the registers: 160 for the row, no spill is
+// expected at 255 (ptxas -v).
+template <int MAX_T = kFusedGrMaxT, bool EXACT_T = false, int NT = 128>
+__global__ void __launch_bounds__(NT) gr_down_s86_kernel(GrMulti m) {
+    constexpr int WARPS = NT / 32;
+    constexpr int DOWN_BLOCKS = LR / WARPS;
+    constexpr int NCH = N_HTILES * HQ;                  // 40 chunks of 8 a lane
+    extern __shared__ __align__(16) float4 hbuf[];      // 2 buffers x [T][2][160] float4
+    const int t = threadIdx.x, lane = t & 31, warp = t >> 5;
+    const int T = EXACT_T ? MAX_T : m.T;
+    const bool inject_block = blockIdx.x == DOWN_BLOCKS;
+    const int row = inject_block ? warp : blockIdx.x * WARPS + warp;
+    const bool active = !(inject_block && (m.a[0].w_inject == nullptr || warp >= HC));
+    const uint16_t* wrow = (inject_block ? m.a[0].w_inject : m.a[0].w_down) + (size_t) (active ? row : 0) * D;
+    const uint4* w4 = reinterpret_cast<const uint4*>(wrow);
+    const size_t buf_f4 = (size_t) T * (H_TILE / 4);
+    float acc[MAX_T];
+#pragma unroll
+    for (int k = 0; k < MAX_T; ++k) acc[k] = 0.0f;
+    uint4 wall[NCH];
+    if (active) {
+#pragma unroll
+        for (int i = 0; i < NCH; ++i) wall[i] = __ldg(w4 + lane + 32 * i);
+    }
+    stage_htile<NT>(m, T, 0, hbuf, t);
+    cp_async_commit();
+    stage_htile<NT>(m, T, 1, hbuf + buf_f4, t);
+    cp_async_commit();
+#pragma unroll
+    for (int h = 0; h < N_HTILES; ++h) {
+        if (h + 1 < N_HTILES) cp_async_wait1();         // tile h has landed (h + 1 may still be on its way)
+        else cp_async_wait0();
+        __syncthreads();
+        const float4* cur = hbuf + (h & 1) * buf_f4;
+        if (active) {
+#pragma unroll
+            for (int q = 0; q < HQ; ++q) {
+                const int j = lane + 32 * q;
+                const Bf16x8 wvq = unpack8(wall[h * HQ + q]);
+#pragma unroll
+                for (int k = 0; k < MAX_T; ++k) {
+                    if (EXACT_T || k < T) {
+                        const float4* pk = cur + (size_t) k * (H_TILE / 4);
+                        acc[k] += dot8u(wvq, pk[j], pk[H_TILE / 8 + j]);
+                    }
+                }
+            }
+        }
+        __syncthreads();                                // every warp is done with buffer h & 1
+        if (h + 2 < N_HTILES) stage_htile<NT>(m, T, h + 2, hbuf + (h & 1) * buf_f4, t);
+        cp_async_commit();
+    }
+    if (!active) return;
+    float s[MAX_T];
+#pragma unroll
+    for (int k = 0; k < MAX_T; ++k) s[k] = (EXACT_T || k < T) ? warp_sum(acc[k]) : 0.0f;
+#pragma unroll
+    for (int k = 0; k < MAX_T; ++k) {
+        if ((!EXACT_T && k >= T) || lane != k) continue;
+        if (inject_block) {
+            m.a[k].inject_out[row] = s[k];
+        } else {
+            const float x = s[k] / (float) HC;
+            m.a[k].lo[row] = x / (1.0f + __expf(-x));
+        }
+    }
+}
+#endif
+
 // the current device is Volta (sm_70): the fast norm/up is its default
 bool cur_dev_volta() {
 #if defined(__HIPCC__)
@@ -972,6 +1048,15 @@ int down_chunk(bool staged, int* tile_out) {
         set_staged_attr(gr_down_staged_kernel<6, true, 128>, 6);
         set_staged_attr(gr_down_staged_kernel<4, false, 128>, 4);
         set_staged_attr(gr_down_staged_kernel<kFusedGrMaxT, false, 128>, kFusedGrMaxT);
+#if !defined(__HIPCC__)
+        set_staged_attr(gr_down_s86_kernel<1, true>, 1);   // STRATA_GR_SM86
+        set_staged_attr(gr_down_s86_kernel<2, true>, 2);
+        set_staged_attr(gr_down_s86_kernel<3, true>, 3);
+        set_staged_attr(gr_down_s86_kernel<4, true>, 4);
+        set_staged_attr(gr_down_s86_kernel<5, true>, 5);
+        set_staged_attr(gr_down_s86_kernel<6, true>, 6);
+        set_staged_attr(gr_down_s86_kernel<kFusedGrMaxT, false>, kFusedGrMaxT);
+#endif
         cudaGetLastError();      // drop any error the attempt left behind
         // The opt-in is a promise a pre-Volta card does not keep: an sm_60 answers 65536 and accepts the
         // cudaFuncSetAttribute for 61440 B, then fails the LAUNCH with "invalid argument".  What such a card
@@ -1037,6 +1122,28 @@ bool gr_128_on() {
     return on[dev] && !g_wide_bad[dev].load();
 }
 
+// STRATA_GR_SM86=1 (opt-in, read once; CUDA devices of compute capability 8.x): the hyper-connection read with the
+// whole-row weight prefetch down kernel (gr_down_s86_kernel), the register norm (gr_norm_split_fast_kernel) and the
+// latency-hidden up (gr_up_fast_kernel); each of them computes the default read's sums in the default order.
+bool gr_s86_on() {
+#if defined(__HIPCC__)
+    return false;
+#else
+    static bool known[64] = {};
+    static bool on[64] = {};
+    int dev = 0;
+    if (cudaGetDevice(&dev) != cudaSuccess || dev < 0 || dev >= 64) return false;
+    if (!known[dev]) {
+        const char* v = std::getenv("STRATA_GR_SM86");
+        int cc_maj = 0;
+        cudaDeviceGetAttribute(&cc_maj, cudaDevAttrComputeCapabilityMajor, dev);
+        on[dev] = v != nullptr && std::atoi(v) != 0 && strata::cc_major_of(cc_maj) == 8;
+        known[dev] = true;
+    }
+    return on[dev];
+#endif
+}
+
 // the split norm with registers (gr_norm_split_fast_kernel): gfx12 only until another arch is measured;
 // STRATA_GR_NORM_FAST=0 / 1 forces it off / on
 bool norm_fast_on() {
@@ -1052,7 +1159,7 @@ bool norm_fast_on() {
     }
     return per_dev[dev] == 2;
 #else
-    return false;
+    return gr_s86_on();   // CUDA: only under STRATA_GR_SM86=1
 #endif
 }
 
@@ -1066,7 +1173,7 @@ void launch_multi(const GrMulti& m, int variant, cudaStream_t st, unsigned long 
 #if STRATA_GR_FAST_BUILD
     // gfx906: the latency-hidden norm/up (STRATA_GR_FAST=0: off) - the same sums in the same order as the kernels
     // they replace (gr_parity checks the multi-token read against single-token calls bitwise)
-    const bool fast = gr_fast();
+    const bool fast = gr_fast() || gr_s86_on();   // STRATA_GR_SM86 takes the up kernel of STRATA_GR_FAST too
     if (variant >= kHcSplit) {
         if (norm_fast_on()) gr_norm_split_fast_kernel<<<dim3((unsigned) n_tok, HC), THREADS, 0, st>>>(m);
         else gr_norm_split_kernel<<<dim3((unsigned) n_tok, HC), THREADS, 0, st>>>(m);
@@ -1107,6 +1214,18 @@ void launch_multi(const GrMulti& m, int variant, cudaStream_t st, unsigned long 
         if (staged) {
             // #783 PR-g (stuchapin909): a launch of exactly ct <= 6 tokens is its own instantiation, the loop bounds
             // are compile-time (the same sums in the same order); STRATA_NO_MULTI_GR=1 keeps the generic kernels
+#if !defined(__HIPCC__)
+            if (!wide && variant != kHcStaged128 && gr_s86_on()) {   // STRATA_GR_SM86: 80 + 1 blocks of 128, the row's weights up front
+                constexpr int WB = LR / 4;
+                if (exact_t && ct == 1) gr_down_s86_kernel<1, true><<<WB + 1, 128, smem, st>>>(c);
+                else if (exact_t && ct == 2) gr_down_s86_kernel<2, true><<<WB + 1, 128, smem, st>>>(c);
+                else if (exact_t && ct == 3) gr_down_s86_kernel<3, true><<<WB + 1, 128, smem, st>>>(c);
+                else if (exact_t && ct == 4) gr_down_s86_kernel<4, true><<<WB + 1, 128, smem, st>>>(c);
+                else if (exact_t && ct == 5) gr_down_s86_kernel<5, true><<<WB + 1, 128, smem, st>>>(c);
+                else if (exact_t && ct == 6) gr_down_s86_kernel<6, true><<<WB + 1, 128, smem, st>>>(c);
+                else gr_down_s86_kernel<kFusedGrMaxT, false><<<WB + 1, 128, smem, st>>>(c);
+            } else
+#endif
             if (wide) {
                 constexpr int WB = LR / 4;          // 80 blocks of 4 rows (+ the inject block)
                 if (exact_t && ct == 1) gr_down_staged_kernel<1, true, 128><<<WB + 1, 128, smem, st>>>(c);

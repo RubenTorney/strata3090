@@ -1271,7 +1271,7 @@ std::atomic<unsigned> g_s86_ok[64];
 
 // the split norm with registers (gr_norm_split_fast_kernel): gfx12 only until another arch is measured;
 // STRATA_GR_NORM_FAST=0 / 1 forces it off / on
-[[maybe_unused]] bool norm_fast_on(unsigned opt) {
+[[maybe_unused]] bool norm_fast_on([[maybe_unused]] unsigned opt) {
 #if defined(__HIPCC__)
     static const int env = [] { const char* e = std::getenv("STRATA_GR_NORM_FAST"); return e != nullptr ? (std::atoi(e) != 0 ? 1 : 0) : -1; }();
     if (env >= 0) return env != 0;

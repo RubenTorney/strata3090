@@ -614,6 +614,57 @@ before). A relative path is in the Strata folder; one file per model, and a prof
 (point the key at another file). The file is a fingerprint of what you used the model for: it stays on your PC.
 Without the key nothing is counted or written. Setup rewrites the config when run again: add the key again then.
 
+**A personal expert profile (opt-in; not yet measured on this machine):** the shipped profile ranks the experts by a
+generic corpus. Two ways to rank them by what you ask the model:
+
+1. Free, from normal use: the `"expert_profile_save"` key above. Use the model as usual; the file it writes on exit is
+   your ranking, and the next start already begins from it.
+2. From a set of prompts you choose, in one go: `tools/profile_personal.py` reads a folder or JSONL files of your prompts
+   or conversations (OpenAI or Anthropic messages, a Claude Code transcript, one prompt per `.txt`), has the engine decode
+   an answer to each with `--dump-routing`, and writes a profile mixed with the shipped one. The server keeps no log of
+   prompt text, so export your client's conversations first. Use the Strata venv (the tool imports the server's chat
+   template and message conversion, so a prompt is rendered and tokenized as the server would send it, with the
+   template's thinking default, or the config's `reasoning_effort`; `--think` / `--no-think` override it; `--system-prompt`
+   and `--tools` add your client's system prompt and tool definitions). Stop the server (the tool needs the GPU and refuses
+   to run while something listens on the config's port), then:
+
+```
+python tools/profile_personal.py strata-iq3_s.json ~/my-prompts --system-prompt agent-system.txt --out expert-profile-me.bin --dry-run
+python tools/profile_personal.py strata-iq3_s.json ~/my-prompts --system-prompt agent-system.txt --out expert-profile-me.bin
+```
+
+   The first line only checks the inputs and prints the plan (prompt count, token counts, the engine command, the time).
+   The second runs the engine once per prompt (about 40 prompts, 30-45 minutes). A trace is written to a `.part` file and
+   kept only when the run succeeds; a run that fails or passes `--timeout` is killed with its process group, counted and
+   skipped (more than 20% failing stops without writing a profile); a prompt already traced is not run again unless its
+   tokens changed. Next to each `pNNN.trace` in `expert-profile-me.bin.traces` the `pNNN.tok` file holds that prompt as
+   token ids: it is your prompt in a form the tokenizer reverses, so keep or delete the folder accordingly.
+
+   The ranking: each prompt's routing becomes a distribution and every prompt counts the same; the shipped profile (and
+   any `--learned FILE`, a profile the engine saved) has ranks without counts, so the engine's own coverage curve
+   (the top fraction `f` of pairs holds `1 - (1 - f)^3` of the routing) gives each rank a share. The profile ranks by the
+   weighted sum of the shares, the weights (yours 0.7, the shipped 0.3 by default with `--base-weight 0.3`, each learned
+   one) scaled to add up to 1. A pair you routed once cannot outrank the shipped profile's hottest pair, and a pair you
+   route a lot can; for a topic you never wrote about the shipped profile's share is all that counts, so its order is
+   kept there but your busy pairs can still push it down. With `--base-weight 0` your pairs come first and the shipped
+   order follows them. It also prints, for the conversations left out of the build (whole conversations, one in five),
+   how much of their routing the top 8,441 pairs cover with the shipped profile and with the new one: an offline
+   coverage of the model's own answers, not the engine's hit rate. The trace holds every position the engine decoded,
+   including draft tokens that a speculative window then rejected, and only the answers, not the prompt's own routing.
+   Then put `--expert-profile /path/to/expert-profile-me.bin` in `strata-<model>.json` and restart.
+
+   `tools/vram_budget.py --pack <pack dir> --from-log strata-iq3_s.log [--start N] [--kv int8|k8v4|q4_0]
+   [--vram-reserve-mib N]` prints how many experts the VRAM holds and how many each context length costs, because with
+   `--kv-grow` the K/V takes expert slots as it grows. It works from the pack's expert sizes, the K/V bytes per cell, and
+   the free VRAM of one start-up line, which it prints (file, line, values); `--start` picks which start of the log (the
+   last by default). On the RTX 3090 log, start 9 (line 995: 16.79 GiB free, 700 MiB reserve, 98 MiB draft head, 6,456 auto
+   slots) gives 8,441 experts at start, and 7,684 at 131,072 cells (K/V int8), the figures that log's own lines show
+   ("7684 of 8441 slots hold experts" after "K/V grown to 131072 cells"). The log has since been appended to; other starts
+   differ by about 10 experts. The K/V bytes of int8 include a 6% overhead fitted to that log (2% low at 262,144 cells);
+   k8v4 and q4_0 are the bare formula with no overhead, so their real cost is likely somewhat higher. The "not accounted"
+   figure is what is left of the free VRAM after the reserve, the draft head and the slots: the engine does not print it.
+   Nothing here has been run for a personal profile on this machine yet: whether it raises the hit rate is not measured.
+
 **The expert cache size is a budget, and on Windows an over-sized one pages instead of failing.** `--expert-cache N`
 (`"expert_cache": N`) is `N` times the largest expert blob, and the engine compares it only with the free VRAM it
 reads **before** the slots are written. `--expert-cache auto` (the default) sizes from that same figure but **checks

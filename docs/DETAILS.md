@@ -103,13 +103,13 @@ every group: the answer then no longer depends on the drafting. Measured on a Ry
 -1..-3%, the other models the same; the default stays the fastest rule. On an Intel CPU of Alder Lake or later
 without AVX-512, where the AVX-2 kernel gathers the IQ3_S grid, `STRATA_IQ3S_MT1=1` (opt-in) gives IQ3_S the multi-token
 kernel for one token, which is the faster one there; it changes a lone token's rounding, so it is off by default. `STRATA_IQ_ZEN3=1` (opt-in, CPUs without AVX-512, aimed at Zen 3 where gathers are slow) switches the IQ3_S and IQ2_S gate/up rows to a
-decode without a gather (grid indices kept in registers; gate and up rows in one pass at one or two tokens) and gives
-those two formats the multi-token kernel for a lone token as well. Each kernel gives the same bits as the other AVX-2
-variants for the same token, but a lone token's rounding differs from the default (ggml's dot against the multi-token
-kernel), so the output is not byte-identical to the default path. Measured only as `iq_avx2_parity --bench` on one
-thread of a Ryzen 5 5600X (ms per expert, gate/up rows, 1 / 2 tokens): IQ2_S 0.214 / 0.277 default AVX-2, 0.195 / 0.245
-with the switch; IQ3_S 0.305 / 0.589 and 0.330 / 0.366 (one token: ggml's dot 0.345). IQ3_XXS is unchanged. Not
-measured in the engine. Through the server, two more things carry
+decode without a gather (grid indices kept in registers; IQ2_S also runs the gate and up rows in one pass; IQ3_S keeps
+the plain decode at one token, where that measured faster) and gives those two formats the multi-token kernel for a lone
+token as well. Each kernel gives the same bits as the other AVX-2 variants for the same token, but a lone token's
+rounding differs from the default (ggml's dot against the multi-token kernel), so the output is not byte-identical to the
+default path. Measured only as `iq_avx2_parity --bench` on one thread of a Ryzen 5 5600X (ms per expert, gate/up rows,
+1 / 2 tokens): IQ2_S 0.213 / 0.279 default AVX-2, 0.195 / 0.247 with the switch (one token: ggml's dot 0.196); IQ3_S
+0.306 / 0.583 and 0.310 / 0.366 (one token: ggml's dot 0.344). IQ3_XXS is unchanged. Not measured in the engine. Through the server, two more things carry
 over from one request to the next (#410): the adaptive tier moves experts between RAM and VRAM (the GPU and the CPU
 round an expert differently), and the prompt cache resumes a repeated prompt and reads only its tail through the
 decode path. For byte-identical repeats add `--prompt-cache 0 --adapt-swaps 0 --pcie-frac 0` to the engine's args

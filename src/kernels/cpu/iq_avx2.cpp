@@ -16,8 +16,9 @@
 // depends on the core, so STRATA_IQ256_GATHER picks it per thread (expert_layout.hpp, cpu_gather_fast_here).
 //
 // STRATA_IQ_ZEN3=1 (opt-in, kIq256Zen3) is the third decode for IQ3_S and IQ2_S, for cores whose gather is slow (Zen 3):
-// no gather and grid indices kept in scalar registers, gate and up rows in one pass at the widths where that measured
-// faster; with it set a lone token of those two formats also takes these kernels (native_gu_mt_min).  The same bits as the other variants for the same token and width.
+// no gather and grid indices kept in scalar registers, gate and up rows in one pass for IQ2_S; IQ3_S takes the plain
+// decode at one token (faster there).  With it set a lone token of those two formats takes the multi-token kernels
+// (native_gu_mt_min).  The same bits as the other variants for the same token and width.
 //
 // Where the CPU has AVX-VNNI (cpu_avxvnni_ok: Alder Lake, Sapphire Rapids and later) the row kernels take a second
 // copy with vpdpwssd / vpdpbusd (iq_avx2_rows.inl), the same integer sums.

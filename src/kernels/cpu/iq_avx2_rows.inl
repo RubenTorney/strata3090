@@ -153,8 +153,9 @@ inline void row_dot_any(const uint8_t* row, int nblocks, const block_q8_K* const
 
 // STRATA_IQ_ZEN3: gate row and up row in one pass over the blocks, the activation block shared.  Per 32-value half it
 // decodes row A and applies it to every token, then row B (the activations are read again from L1), so only one row's
-// grid / sign / scale vectors are live at a time (the pass at two tokens of IQ3_S measured slower than two row_dot
-// calls, 0.40 against 0.37 ms per expert on a 5600X, so it stops at one token there).  Each row keeps its own int32 and float accumulators, added in the
+// grid / sign / scale vectors are live at a time (at two tokens of IQ3_S it measured slower than two row_dot calls, 0.40
+// against 0.37 ms per expert on a 5600X, and at one token the plain kernel was faster still, so only IQ2_S uses
+// this pass).  Each row keeps its own int32 and float accumulators, added in the
 // same order as row_dot, so the results are bit for bit row_dot's.
 template <int TY, int NT> STRATA_ROWS_FN
 inline void row_dot2(const uint8_t* rowA, const uint8_t* rowB, int nblocks, const block_q8_K* const* y, float* resA,
@@ -207,7 +208,7 @@ void gu_rows(const uint8_t* blob, size_t gu_row, size_t up_off, int n, const voi
     const int nb = n / QK_K;
     float g[NT], u[NT];
     for (int r = r0; r < r1; ++r) {
-        if constexpr (TY >= 300 && NT <= (TY == 322 ? 2 : 1)) {   // the widths where the pass measured faster (--bench)
+        if constexpr (TY == 322 && NT <= 2) {   // IQ2_S only: IQ3_S measured faster as two row_dot calls (see row_dot2)
             row_dot2<TY, NT>(blob + (size_t) r * gu_row, blob + up_off + (size_t) r * gu_row, nb, y, g, u);
         } else {
             row_dot_any<TY, NT>(blob + (size_t) r * gu_row, nb, y, g);
@@ -258,7 +259,7 @@ void dot_rows_nt(int nt, const uint8_t* w, size_t row_bytes, int n, const void* 
     }
 }
 
-// The decode of each format for a variant (G 0 plain, 1 kIq256Gather, 2 kIq256Zen3) for IQ3_XXS, IQ3_S and IQ2_S.
+// The decode of each format for a variant (G 0 plain, 1 kIq256Gather, 2 kIq256Zen3; Zen 3 takes IQ3_S's plain decode at one token, where that measured faster) for IQ3_XXS, IQ3_S and IQ2_S.
 template <int G> STRATA_ROWS_FN
 void gu_type(int type, int nt, const uint8_t* blob, size_t gu_row, size_t up_off, int n, const void* const* act,
              float* const* ff, int r0, int r1) {
@@ -266,7 +267,10 @@ void gu_type(int type, int nt, const uint8_t* blob, size_t gu_row, size_t up_off
         case 16: gu_rows_nt<16>(nt, blob, gu_row, up_off, n, act, ff, r0, r1); break;
         case 17: gu_rows_nt<17>(nt, blob, gu_row, up_off, n, act, ff, r0, r1); break;
         case 18: gu_rows_nt<G == 2 ? 18 : G ? 118 : 18>(nt, blob, gu_row, up_off, n, act, ff, r0, r1); break;
-        case 21: gu_rows_nt<G == 2 ? 321 : G ? 121 : 21>(nt, blob, gu_row, up_off, n, act, ff, r0, r1); break;
+        case 21:
+            if (G == 2 && nt == 1) gu_rows_nt<21>(nt, blob, gu_row, up_off, n, act, ff, r0, r1);   // measured faster at one token
+            else gu_rows_nt<G == 2 ? 321 : G ? 121 : 21>(nt, blob, gu_row, up_off, n, act, ff, r0, r1);
+            break;
         case 22: gu_rows_nt<G == 2 ? 322 : G ? 122 : 22>(nt, blob, gu_row, up_off, n, act, ff, r0, r1); break;
         case 23: gu_rows_nt<23>(nt, blob, gu_row, up_off, n, act, ff, r0, r1); break;
         default: break;
@@ -280,7 +284,10 @@ void dot_type(int type, int nt, const uint8_t* w, size_t row_bytes, int n, const
         case 16: dot_rows_nt<16>(nt, w, row_bytes, n, act, out, r0, r1); break;
         case 17: dot_rows_nt<17>(nt, w, row_bytes, n, act, out, r0, r1); break;
         case 18: dot_rows_nt<G == 2 ? 18 : G ? 118 : 18>(nt, w, row_bytes, n, act, out, r0, r1); break;
-        case 21: dot_rows_nt<G == 2 ? 321 : G ? 121 : 21>(nt, w, row_bytes, n, act, out, r0, r1); break;
+        case 21:
+            if (G == 2 && nt == 1) dot_rows_nt<21>(nt, w, row_bytes, n, act, out, r0, r1);
+            else dot_rows_nt<G == 2 ? 321 : G ? 121 : 21>(nt, w, row_bytes, n, act, out, r0, r1);
+            break;
         case 22: dot_rows_nt<G == 2 ? 322 : G ? 122 : 22>(nt, w, row_bytes, n, act, out, r0, r1); break;
         case 23: dot_rows_nt<23>(nt, w, row_bytes, n, act, out, r0, r1); break;
         default: break;

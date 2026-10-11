@@ -8,35 +8,52 @@ it reads your prompts (a folder, JSONL files), has the engine decode an answer t
 
 CONFIG.json is the run config setup wrote (strata-*.json).  Each SOURCE is a folder or a file:
     .jsonl / .json   one record per line (or a list), any of: {"p"|"prompt"|"text": "..."}; {"messages": [{"role",
-                     "content"}...]} (OpenAI or Anthropic content blocks); one message per line {"role","content"};
-                     a Claude Code transcript line {"type": "user"|"assistant", "message": {...}}.  Lines of one file
-                     with a "sessionId" are one conversation; single messages of one file without it are one too.
+                     "content"}...]} (OpenAI, or Anthropic content blocks), with optional "system" and "tools"; one
+                     message per line {"role","content"}; a Claude Code transcript line {"type": "user"|"assistant",
+                     "message": {...}}.  Lines of one file with a "sessionId" are one conversation; single messages of
+                     one file without it are one too.  A bad line is an error naming file and line (`--skip-bad`
+                     skips and counts them).
     .txt / .md       the whole file is one user prompt.
-A conversation gives one prompt per user turn: the conversation up to that turn.  `--max-prompts N` (default 40) keeps N of
-them, evenly spread.  `--system-prompt FILE` puts your agent client's system prompt in front of every one (its decode then
-runs in that context; it costs a prefill of its length per prompt).  The server keeps no log of prompt text, so there is
-none to read: export your client's conversations, or write the prompts to a folder.
+A conversation gives one prompt per user message (a tool result is not one unless `--tool-turns`): the conversation up to
+that message.  `--max-prompts N` (default 40) keeps N of them, evenly spread.  `--system-prompt FILE` (and `--tools FILE`,
+a JSON list of the client's tool definitions) go in front of every prompt, as your client sends them.  The server keeps no
+log of prompt text, so there is none to read: export your client's conversations, or write the prompts to a folder.
 
-The ranking: every prompt's trace becomes a distribution (counts / total) and each prompt counts the same; the pairs are
-ranked by it.  With `--base-weight W` (0-1, default 0.3 when a base exists) that ranking is blended with the base
-profile's by rank: score = (1 - W) * your percentile + W * the base's, so topics you did not write about keep a place
-instead of falling to the tail.  `--base-weight 0` or `--no-base` ranks by your traces alone.  `--learned FILE[:W]` adds a
-profile the engine saved with `"expert_profile_save"` (docs/DETAILS.md) as one more ranking at weight W (default 1).
-The pairs nobody ranked follow in make_profile.py's fill order.
+The prompt is rendered and tokenized with the SERVER's own code (serve/frontend.py: its chat template, its conversion of
+OpenAI and Anthropic messages, tool blocks, merged tool results, reasoning-effort kwargs, and the rule that a control
+token written inside a message stays text), so it is the prompt the server would send.  Thinking follows the server's
+default (the config's "reasoning_effort", else the template's); `--think` / `--no-think` override it.  Not modelled:
+"effort_position": "end" (a setting that moves the effort text), images, a client that sends other fields.
 
-`--holdout F` (default 0.2, needs 5+ prompts) builds the profile from the other prompts first and prints how much of the
-held-out prompts' routing the top `--top` pairs of the base and of the new profile cover.  That is an offline coverage, not
-the engine's hit rate, and it is what the decode of YOUR prompts routes, not of the prompts the engine will meet.
+The ranking: every prompt's trace becomes a distribution (counts / total), each prompt counting the same.  The base
+profile (and each `--learned FILE`, a profile the engine saved with "expert_profile_save") is a ranking without counts, so
+it is turned into shares by the engine's own coverage curve (the held share of the routed mass H(f) = 1 - (1 - f)^3,
+src/program/generate.cpp; `--base-curve-b`).  The profile ranks by the weighted sum of the shares, the weights
+(yours 1 - W, the base W, each learned) scaled to add up to 1.  So a pair you routed once cannot outrank the base's hottest
+pair, and a pair you route often can; nothing is promised for topics you did not write about beyond that the base's share
+still counts for them.  `--base-weight 0` or `--no-base` ranks by your traces alone; with `--base-weight 0` the base's order
+is what follows your pairs, with `--no-base` the fill order.  `--n-expert` defaults to the base's.
+
+`--holdout F` (default 0.2, needs 5+ conversations) builds the profile from the other conversations first and prints how
+much of the held-out ones' routing the top `--top` pairs of the base and of the new profile cover.  That is an offline
+coverage of the model's own answers, not the engine's hit rate.  The trace holds every position the engine decoded,
+including draft tokens a speculative window then rejected.
 
 The engine runs once per prompt (20-60 s to start, ~10 s to decode; 40 prompts take ~30-45 minutes) and needs the VRAM:
-STOP the server first.  `--dry-run` reads the inputs, tokenizes, and prints the plan without starting anything.  A prompt whose
-trace already exists in OUTDIR (default: <out>.traces) is not run again.  `--traces-only` skips the engine and builds from
-the traces in OUTDIR.  Not measured on a machine yet: see docs/DETAILS.md, "A personal expert profile".
+STOP the server first (the tool refuses while something listens on the config's port).  A run that fails or exceeds
+`--timeout` is killed with its process group, counted, and skipped; more than `--max-failed` of them (a share) is an error and
+no profile is written.  `--dry-run` reads the inputs, tokenizes, and prints the plan without starting anything.  Traces go
+to OUTDIR (default <out>.traces) as pNNN.trace (written to .part and renamed only on success) beside pNNN.tok, which holds
+the prompt as token ids (reversible text: decode them to read the prompt); a prompt is run again unless its trace exists
+AND its .tok equals the new token ids.  `--traces-only` skips the engine.  Not measured on a machine yet: see
+docs/DETAILS.md, "A personal expert profile".
 """
 import argparse
 import json
 import os
+import signal
 import socket
+import struct
 import subprocess
 import sys
 from collections import defaultdict
@@ -44,10 +61,11 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(ROOT))
 import make_profile as mp  # noqa: E402
 
-N_PAIRS = mp.N_LAYER * mp.N_EXPERT
 DEFAULT_TOP = 8441          # pairs the 24 GB card's cache holds at the default reserve (docs/DETAILS.md; see vram_budget.py)
+COVER_B = 3.0               # the engine's coverage curve H(f) = 1 - (1 - f)^b (src/program/generate.cpp)
 
 
 # ---------------------------------------------------------------------------------------------------- pure: ranking
@@ -58,55 +76,49 @@ def distribution(freq):
     return {p: c / total for p, c in freq.items()} if total > 0 else {}
 
 
-def ranking_from_traces(traces, weights=None):
-    """Pairs most-wanted first from several traces ({pair: count}), each trace counting `weight` (default 1) of one."""
+def mean_distribution(traces):
+    """The shares of several traces, each counting the same (they add up to 1)."""
     score = defaultdict(float)
-    for i, freq in enumerate(traces):
-        w = 1.0 if weights is None else weights[i]
+    n = sum(1 for t in traces if distribution(t))
+    for freq in traces:
         for p, s in distribution(freq).items():
-            score[p] += w * s
-    return [p for p, _ in sorted(score.items(), key=lambda kv: (-kv[1], kv[0]))]
+            score[p] += s / n
+    return dict(score)
 
 
-def percentiles(ranked, n_total=N_PAIRS):
-    """{pair: score in (0, 1]} by rank (rank 0 -> 1.0); a pair the list does not hold gets the mean of the tail it leaves
-    (the pairs it does not rank are tied, not last)."""
-    n = len(ranked)
-    out = {p: 1.0 - i / n_total for i, p in enumerate(ranked)}
-    out[None] = 1.0 - (n + n_total) / 2.0 / n_total if n < n_total else 0.0   # the unranked pairs' shared score
-    return out
+def rank_shares(ranked, n_total, b=COVER_B):
+    """{pair: share} for a ranking without counts: rank r holds the increment of the coverage curve
+    H(f) = 1 - (1 - f)^b, f = r / n_total, so any prefix of N pairs holds H(N / n_total) and the shares add up to 1."""
+    return {p: (1.0 - r / n_total) ** b - (1.0 - (r + 1) / n_total) ** b for r, p in enumerate(ranked)}
 
 
-def blend_rankings(sources, n_expert=mp.N_EXPERT):
-    """One ranked (layer, expert) list from [(weight, ranked list)]: the weighted sum of each list's rank percentile.
-    Ties break by (layer, expert); the pairs no list ranks are appended in make_profile.py's fill order."""
+def personal_ranking(trace_freqs, base_ranked, base_weight, learned=(), n_expert=mp.N_EXPERT, b=COVER_B):
+    """The profile's ranked list from [{pair: count}] traces, the base ranking, its weight and [(ranked, weight)] more.
+
+    score(pair) = sum of weight * share, the weights (yours 1 - base_weight, the base's, each learned) scaled to add up
+    to 1.  With base_weight 0 the base's order follows the scored pairs (then the fill order for what it lacks)."""
     n_total = mp.N_LAYER * n_expert
-    sources = [(w, r) for w, r in sources if w > 0 and r]
-    tables = [(w, percentiles(r, n_total)) for w, r in sources]
-    pairs = set()
-    for _, r in sources:
-        pairs.update(r)
-    score = {}
-    for p in pairs:
-        score[p] = sum(w * t.get(p, t[None]) for w, t in tables)
+    mine = mean_distribution(trace_freqs)
+    parts = []                                   # (weight, {pair: share})
+    if mine:
+        parts.append((1.0 - base_weight if base_ranked else 1.0, mine))
+    if base_ranked and base_weight > 0:
+        parts.append((base_weight, rank_shares(base_ranked, n_total, b)))
+    parts += [(w, rank_shares(r, n_total, b)) for r, w in learned if w > 0 and r]
+    if not parts:
+        raise ValueError("nothing to rank: no traces, no base, no learned profile")
+    total_w = sum(w for w, _ in parts)
+    score = defaultdict(float)
+    for w, shares in parts:
+        for p, s in shares.items():
+            score[p] += w / total_w * s
     ranked = [p for p, _ in sorted(score.items(), key=lambda kv: (-kv[1], kv[0]))]
     seen = set(ranked)
+    tail = [p for p in (base_ranked if base_weight <= 0 else ()) if p not in seen]
+    seen.update(tail)
+    ranked += tail
     ranked += [(layer, e) for e in range(n_expert) for layer in range(mp.N_LAYER) if (layer, e) not in seen]
     return ranked
-
-
-def personal_ranking(trace_freqs, base_ranked, base_weight, learned=(), n_expert=mp.N_EXPERT):
-    """The profile's ranked list: your traces (weight 1 - base_weight), the base (base_weight), each `learned` (list, weight)."""
-    mine = ranking_from_traces(trace_freqs)
-    sources = []
-    if mine:
-        sources.append((1.0 - base_weight if base_ranked else 1.0, mine))
-    if base_ranked and base_weight > 0:
-        sources.append((base_weight, list(base_ranked)))
-    sources += [(w, list(r)) for r, w in learned]
-    if not sources:
-        raise ValueError("nothing to rank: no traces, no base, no learned profile")
-    return blend_rankings(sources, n_expert)
 
 
 def coverage(ranked, freq, top):
@@ -118,13 +130,15 @@ def coverage(ranked, freq, top):
     return sum(c for p, c in freq.items() if p in keep) / total
 
 
-def split_holdout(items, fraction):
-    """(train, held-out): every k-th item is held out so the split is spread, not the tail; none below 5 items."""
-    if fraction <= 0 or len(items) < 5:
-        return list(items), []
+def split_holdout(groups, fraction):
+    """[bool held-out] for a list of group ids (one per trace): WHOLE groups (conversations) are held out, every k-th
+    group in order of first appearance; nothing below 5 groups."""
+    order = list(dict.fromkeys(groups))
+    if fraction <= 0 or len(order) < 5:
+        return [False] * len(groups)
     k = max(int(round(1.0 / fraction)), 2)
-    held = [x for i, x in enumerate(items) if i % k == k - 1]
-    return [x for i, x in enumerate(items) if i % k != k - 1], held
+    held = {g for i, g in enumerate(order) if i % k == k - 1}
+    return [g in held for g in groups]
 
 
 def pooled(freqs):
@@ -135,72 +149,133 @@ def pooled(freqs):
     return out
 
 
+def read_trace_checked(path, n_expert=mp.N_EXPERT):
+    """make_profile.read_trace, but a trace whose last record is cut short (or that has stray bytes) is a ValueError
+    naming the file, not a struct.error or a silently short count."""
+    blob = Path(path).read_bytes()
+    off = 0
+    try:
+        while off + 8 <= len(blob):
+            _layer, k = struct.unpack_from("<ii", blob, off)
+            if k < 0 or k > 1024:
+                raise struct.error("bad record")
+            off += 8 + 8 * k
+    except struct.error:
+        off = -1
+    if off != len(blob):
+        raise ValueError(f"{path}: truncated or damaged trace (a run that was cut off): delete it")
+    return mp.read_trace(path, n_expert)
+
+
+def profile_n_expert(path):
+    """The experts per layer in a profile's header, or None if the file is not a profile."""
+    try:
+        head = Path(path).read_bytes()[:24]
+    except OSError:
+        return None
+    if len(head) < 24 or head[:4] != mp.MAGIC:
+        return None
+    return struct.unpack_from("<5I", head, 4)[2]
+
+
 # ---------------------------------------------------------------------------------------------------- pure: inputs
 
-def _text(content):
-    """The text of an OpenAI string / Anthropic block-list content."""
-    if isinstance(content, str):
+TOOL_BLOCKS = ("tool_use", "tool_result", "thinking")
+
+
+def _blocks(content):
+    """The content as a list of blocks, or the string: a dict is one block, None is empty."""
+    if content is None:
+        return ""
+    if isinstance(content, dict):
+        return [content]
+    if isinstance(content, (str, list)):
         return content
-    parts = []
-    for b in content or []:
-        if isinstance(b, str):
-            parts.append(b)
-        elif isinstance(b, dict):
-            t = b.get("type")
-            if t in (None, "text") and isinstance(b.get("text"), str):
-                parts.append(b["text"])
-            elif t == "tool_use":
-                parts.append("<tool_call>\n" + json.dumps({"name": b.get("name"), "arguments": b.get("input")},
-                                                           ensure_ascii=False) + "\n</tool_call>")
-            elif t == "tool_result":
-                parts.append("<tool_response>\n" + _text(b.get("content")) + "\n</tool_response>")
-    return "\n".join(parts)
+    raise ValueError(f"content is a {type(content).__name__}, not text or a list of blocks")
+
+
+def _is_tool_result(msg):
+    c = msg["content"]
+    return msg["role"] == "tool" or (isinstance(c, list) and any(isinstance(b, dict) and b.get("type") == "tool_result" for b in c)
+                                     and not any(isinstance(b, dict) and b.get("type") == "text" and b.get("text", "").strip()
+                                                 for b in c))
 
 
 def _message(d):
-    """(role, text) of a record that is one message, else None."""
+    """{"role", "content", ...} of a record that is one message, else None (a summary line, a metadata line)."""
     if isinstance(d.get("message"), dict) and d.get("type") in ("user", "assistant", "system"):
         d = d["message"]
     role = d.get("role")
-    if role in ("user", "assistant", "system", "tool") and "content" in d:
-        text = _text(d["content"])
-        for tc in d.get("tool_calls") or []:
-            fn = tc.get("function", tc)
-            args = fn.get("arguments")
-            text += "\n<tool_call>\n" + json.dumps({"name": fn.get("name"), "arguments": args}, ensure_ascii=False) + "\n</tool_call>"
-        if role == "tool":
-            role, text = "user", "<tool_response>\n" + text + "\n</tool_response>"
-        return role, text
-    return None
+    if role not in ("user", "assistant", "system", "tool", "developer") or ("content" not in d and not d.get("tool_calls")):
+        return None
+    m = {"role": "system" if role == "developer" else role, "content": _blocks(d.get("content"))}
+    for k in ("tool_calls", "reasoning_content", "tool_call_id", "name"):
+        if d.get(k) is not None:
+            m[k] = d[k]
+    return m
 
 
-def conversations_from_records(records):
-    """Conversations ([(role, text)]) from parsed JSON records of ONE file; see the module doc for the shapes."""
+def _style(msgs):
+    """"anthropic" when a message carries tool_use / tool_result / thinking blocks, else "openai"."""
+    for m in msgs:
+        if isinstance(m["content"], list) and any(isinstance(b, dict) and b.get("type") in TOOL_BLOCKS for b in m["content"]):
+            return "anthropic"
+    return "openai"
+
+
+def _conversation(msgs, system=None, tools=None):
+    sys_msgs = [m["content"] if isinstance(m["content"], str) else "\n".join(
+        b.get("text", "") for b in m["content"] if isinstance(b, dict)) for m in msgs if m["role"] == "system"]
+    return {"messages": [m for m in msgs if m["role"] != "system"], "system": system or ("\n\n".join(sys_msgs) or None),
+            "tools": tools}
+
+
+def conversations_from_records(records, name="records", bad=None):
+    """Conversations ({"messages", "system", "tools"}) from [(line number, parsed JSON)] of ONE file; see the module doc.
+    A malformed record raises ValueError("<name>:<line>: ..."), or with `bad` (a list) is appended to it and skipped."""
     convs, loose, by_session = [], [], defaultdict(list)
-    for d in records:
+    for n, d in records:
+        where = f"{name}:{n}"
         if not isinstance(d, dict):
+            if bad is None:
+                raise ValueError(f"{where}: a record must be a JSON object")
+            bad.append(f"{where}: a record must be a JSON object")
             continue
-        if isinstance(d.get("messages"), list):
-            msgs = [m for m in (_message(x) for x in d["messages"] if isinstance(x, dict)) if m]
-            if msgs:
-                convs.append(msgs)
-            continue
-        for key in ("p", "prompt", "text"):
-            if isinstance(d.get(key), str) and d[key].strip():
-                convs.append([("user", d[key])])
-                break
-        else:
-            m = _message(d)
-            if m:
-                (by_session[d["sessionId"]] if d.get("sessionId") else loose).append(m)
-    convs += list(by_session.values())
+        try:
+            if "messages" in d:
+                if not isinstance(d["messages"], list) or not all(isinstance(x, dict) for x in d["messages"]):
+                    raise ValueError("messages must be a list of objects")
+                msgs = [m for m in (_message(x) for x in d["messages"]) if m]
+                tools = d.get("tools") if isinstance(d.get("tools"), list) else None
+                sysp = d.get("system") if isinstance(d.get("system"), str) else None
+                if msgs:
+                    convs.append(_conversation(msgs, sysp, tools))
+                continue
+            for key in ("p", "prompt", "text"):
+                if key in d:
+                    if not isinstance(d[key], str):
+                        raise ValueError(f"{key} must be a string")
+                    if d[key].strip():
+                        convs.append(_conversation([{"role": "user", "content": d[key]}]))
+                    break
+            else:
+                m = _message(d)
+                if m:
+                    (by_session[d["sessionId"]] if d.get("sessionId") else loose).append(m)
+        except ValueError as e:
+            if bad is None:
+                raise ValueError(f"{where}: {e}")
+            bad.append(f"{where}: {e}")
+    convs += [_conversation(v) for v in by_session.values()]
     if loose:
-        convs.append(loose)
+        convs.append(_conversation(loose))
     return convs
 
 
-def load_conversations(path):
-    """Conversations of a file or a folder (recursive), in sorted file order.  Raises FileNotFoundError / ValueError."""
+def load_conversations(path, skip_bad=False, bad=None):
+    """Conversations of a file or a folder (recursive), in sorted file order.  Raises FileNotFoundError / ValueError;
+    with skip_bad a bad line is appended to `bad` (a list) and skipped instead."""
+    bad = [] if bad is None else bad
     p = Path(path)
     if not p.exists():
         raise FileNotFoundError(f"{path}: no such file or folder")
@@ -211,32 +286,43 @@ def load_conversations(path):
         if suffix in (".txt", ".md"):
             t = f.read_text(encoding="utf-8", errors="replace")
             if t.strip():
-                convs.append([("user", t)])
+                convs.append(_conversation([{"role": "user", "content": t}]))
         elif suffix in (".jsonl", ".json"):
             raw = f.read_text(encoding="utf-8-sig", errors="replace")
+            records = []
             try:
                 data = json.loads(raw)
-                records = data if isinstance(data, list) else [data]
+                records = list(enumerate(data if isinstance(data, list) else [data], 1))
             except json.JSONDecodeError:
-                records = []
                 for n, line in enumerate(raw.splitlines(), 1):
-                    if line.strip():
-                        try:
-                            records.append(json.loads(line))
-                        except json.JSONDecodeError as e:
+                    if not line.strip():
+                        continue
+                    try:
+                        records.append((n, json.loads(line)))
+                    except json.JSONDecodeError as e:
+                        if not skip_bad:
                             raise ValueError(f"{f}:{n}: not JSON ({e.msg})")
-            convs += conversations_from_records(records)
+                        bad.append(f"{f}:{n}")
+            convs += conversations_from_records(records, str(f), bad if skip_bad else None)
     return convs
 
 
-def prompt_points(convs):
-    """One candidate per user turn: the conversation up to and including it (system turns of the source are dropped)."""
+def prompt_points(convs, tool_turns=False):
+    """[(conversation index, request)] one per user message: the conversation up to and including it.  A tool result
+    (a "tool" message, or a user message with only tool_result blocks) is one only with `tool_turns`.  The request is
+    {"messages", "system", "tools", "style"} in the shape serve/frontend.py's converters read."""
     out = []
-    for conv in convs:
-        conv = [(r, t) for r, t in conv if r != "system" and t.strip()]
-        for i, (r, _) in enumerate(conv):
-            if r == "user":
-                out.append(conv[:i + 1])
+    for ci, conv in enumerate(convs):
+        msgs = [m for m in conv["messages"] if m["role"] in ("user", "assistant", "tool")]
+        style = _style(msgs)
+        for i, m in enumerate(msgs):
+            if m["role"] == "assistant":
+                continue
+            tool = _is_tool_result(m)
+            if (m["role"] == "user" and not tool) or (tool_turns and tool):
+                if m["content"] in ("", []):
+                    continue
+                out.append((ci, {"messages": msgs[:i + 1], "system": conv["system"], "tools": conv["tools"], "style": style}))
     return out
 
 
@@ -247,58 +333,176 @@ def pick_evenly(items, n):
     return [items[(i * len(items)) // n + (len(items) // n) // 2] for i in range(n)]
 
 
-def render_prompt(conv, system=None, max_turns=None):
-    """The chat-template text that ends where the model answers (the empty think block, as collect_profile_traces.py)."""
-    if max_turns is not None and len(conv) > max_turns:
-        conv = conv[-max_turns:]
-        while conv and conv[0][0] != "user":
-            conv = conv[1:]
-    s = f"<|im_start|>system\n{system}<|im_end|>\n" if system else ""
-    for role, text in conv:
-        s += f"<|im_start|>{role}\n{text}<|im_end|>\n"
-    return s + "<|im_start|>assistant\n<think>\n\n</think>\n\n"
+def trim_turns(msgs, max_turns):
+    """The last `max_turns` messages, from a plain user message on (a tool result is never the first)."""
+    if max_turns is None or len(msgs) <= max_turns:
+        return msgs
+    cut = msgs[-max_turns:]
+    while len(cut) > 1 and not (cut[0]["role"] == "user" and not _is_tool_result(cut[0])):
+        cut = cut[1:]
+    return cut
+
+
+# ---------------------------------------------------------------------------------------------------- the server's code
+
+class Renderer:
+    """serve/frontend.py's rendering, as the server's Service.encode_prompt does it (effort_position "end" aside)."""
+
+    def __init__(self, tokenizer_dir, cfg, think=None):
+        import serve.frontend as F
+        self.F = F
+        tdir = Path(tokenizer_dir)
+        tpl = tdir / "chat_template.jinja"
+        self.template = F.ChatTemplate(tpl if tpl.exists() else ROOT / "serve" / "chat_template.jinja")
+        import collect_profile_traces as C
+        self.tok = C.load_tokenizer(tdir)
+        self.literals = F.literal_tags(getattr(self.tok, "control_tokens", ()))
+        # the server's default: the config's reasoning_effort for a request that gives none, else the template's own
+        self.kwargs = F.effort_kwargs(cfg.get("reasoning_effort"))
+        if think is False:
+            self.kwargs = {"enable_thinking": False}
+        elif think is True:
+            self.kwargs = {k: v for k, v in self.kwargs.items() if k != "enable_thinking"}
+
+    def convert(self, req, system=None, tools=None, max_turns=None):
+        F = self.F
+        msgs = trim_turns(req["messages"], max_turns)
+        sysp = system if system is not None else req["system"]
+        body = {"messages": msgs, "tools": tools if tools is not None else req["tools"]}
+        if req["style"] == "anthropic":
+            if sysp:
+                body["system"] = sysp
+            return F.anthropic_to_messages(body)[:2]
+        if sysp:
+            body["messages"] = [{"role": "system", "content": sysp}] + msgs
+        return F.openai_to_messages(body)[:2]
+
+    def encode(self, req, system=None, tools=None, max_turns=None):
+        F = self.F
+        messages, tpl_tools = self.convert(req, system, tools, max_turns)
+        marked, marked_tools, changed = F.mark_think_literals(messages, tpl_tools, self.literals)
+        prompt = self.template.render(marked, tools=marked_tools, **self.kwargs)
+        if not changed:
+            return self.tok.encode(prompt, parse_special=True)
+        prompt, plain = F.unmark_think_literals(prompt, self.literals)
+        return self.tok.encode(prompt, parse_special=True, plain=plain)
 
 
 # ---------------------------------------------------------------------------------------------------- the engine
 
-def engine_command(cfg, tokens_file, max_new, trace):
-    import collect_profile_traces as C
-    args = C.drop(C.drop(C.drop(cfg["args"], "--serve"), "--batch", True), "--expert-profile-save", True)
-    return [cfg["exe"]] + args + ["--tokens-file", str(tokens_file), "--max-new", str(max_new), "--greedy",
-                                  "--dump-routing", str(trace)]
+STRIP_FLAGS = (("--serve", False), ("--batch", True), ("--expert-profile-save", True),
+               ("--expert-profile-save-every", True), ("--vision", False))
+
+
+def drop(args, flag, with_value=False):
+    """`args` without every `flag` (and its value)."""
+    args = list(args)
+    while flag in args:
+        i = args.index(flag)
+        del args[i:i + (2 if with_value else 1)]
+    return args
+
+
+def engine_args(cfg):
+    """The engine's arguments as the server builds them (serve/server.py engine_args), minus what a one-shot trace
+    run does not use: --serve, --batch, the profile save, --vision (the trace is text)."""
+    try:
+        import serve.server as S
+        args = S.engine_args(cfg)
+    except Exception:                                   # the server's module is not importable: the config's own
+        args = list(cfg["args"])
+    for flag, valued in STRIP_FLAGS:
+        args = drop(args, flag, valued)
+    return args
 
 
 def engine_env(cfg):
-    env = dict(os.environ)
-    env.update({k: str(v) for k, v in cfg.get("env", {}).items()})
-    dirs = [d for d in cfg.get("lib_dirs") or [] if Path(d).is_dir()]
-    if dirs:
-        key = "PATH" if os.name == "nt" else "LD_LIBRARY_PATH"
-        env[key] = os.pathsep.join(dirs + ([env[key]] if env.get(key) else []))
-    return env
-
-
-def server_listening(port):
+    """The engine's environment as the server builds it (serve/server.py child_env): the GPU numbering, the config's env,
+    the library directories."""
     try:
-        with socket.create_connection(("127.0.0.1", int(port)), timeout=0.5):
-            return True
-    except OSError:
-        return False
+        import serve.server as S
+        return S.child_env(cfg)
+    except Exception:
+        env = dict(os.environ)
+        gpu = cfg.get("gpu")
+        if gpu not in (None, ""):
+            env["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
+            env["CUDA_VISIBLE_DEVICES"] = ",".join(str(x).strip() for x in (gpu if isinstance(gpu, (list, tuple)) else str(gpu).split(",")))
+        env.update({str(k): str(v) for k, v in (cfg.get("env") or {}).items()})
+        dirs = [d for d in cfg.get("lib_dirs") or [] if Path(d).is_dir()]
+        if dirs:
+            key = "PATH" if os.name == "nt" else "LD_LIBRARY_PATH"
+            env[key] = os.pathsep.join(dirs + ([env[key]] if env.get(key) else []))
+        return env
 
 
-def find_config(arg):
-    if arg:
-        return Path(arg)
-    found = sorted(Path.cwd().glob("strata-*.json"))
-    if len(found) != 1:
-        raise SystemExit("name the config: " + (", ".join(map(str, found)) if found else "no strata-*.json here"))
-    return found[0]
+def resolve_exe(cfg, config_path):
+    """The engine binary: a relative path is the config's cwd's (else the config's folder)."""
+    exe = Path(cfg["exe"])
+    if exe.is_absolute() or (os.sep not in cfg["exe"] and "/" not in cfg["exe"]):
+        return str(exe)
+    base = Path(cfg["cwd"]) if cfg.get("cwd") else Path(config_path).resolve().parent
+    if not base.is_absolute():
+        base = Path(config_path).resolve().parent / base
+    return str((base / exe).resolve())
+
+
+def engine_command(cfg, config_path, tokens_file, max_new, trace):
+    return [resolve_exe(cfg, config_path)] + engine_args(cfg) + [
+        "--tokens-file", str(tokens_file), "--max-new", str(max_new), "--greedy", "--dump-routing", str(trace)]
+
+
+def arg_value(args, flag):
+    return args[args.index(flag) + 1] if flag in args[:-1] else None
+
+
+def listening(cfg):
+    """'host:port' when something answers on the config's port, on 127.0.0.1 or on the config's host, else None."""
+    hosts = ["127.0.0.1"]
+    h = cfg.get("host")
+    if isinstance(h, str) and h and h not in ("0.0.0.0", "::", "127.0.0.1"):
+        hosts.append(h)
+    for host in hosts:
+        try:
+            with socket.create_connection((host, int(cfg.get("port", 8080))), timeout=0.5):
+                return f"{host}:{cfg.get('port', 8080)}"
+        except OSError:
+            pass
+    return None
+
+
+def kill_group(p):
+    try:
+        if os.name == "nt":
+            p.kill()
+        else:
+            os.killpg(p.pid, signal.SIGKILL)
+    except (ProcessLookupError, PermissionError):
+        pass
+
+
+def run_engine(cmd, cwd, env, timeout):
+    """Runs the engine in its own process group; (returncode, stderr tail).  A run past `timeout` seconds is killed with
+    its group (no matching by name) and returns (None, ...)."""
+    kw = {"start_new_session": True} if os.name != "nt" else {"creationflags": getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)}
+    p = subprocess.Popen(cmd, cwd=cwd, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+                         errors="replace", **kw)
+    try:
+        _out, err = p.communicate(timeout=timeout)
+        return p.returncode, err[-600:]
+    except subprocess.TimeoutExpired:
+        kill_group(p)
+        _out, err = p.communicate()
+        return None, err[-600:]
+    except BaseException:
+        kill_group(p)
+        raise
 
 
 # ---------------------------------------------------------------------------------------------------- main
 
 def parse_learned(spec):
-    path, w = spec, 1.0
+    path, w = spec, 0.5
     head, sep, tail = spec.rpartition(":")
     if sep:
         try:
@@ -317,13 +521,23 @@ def main():
     ap.add_argument("--base", default=str(ROOT / "data" / "expert-profile.bin"))
     ap.add_argument("--no-base", action="store_true")
     ap.add_argument("--base-weight", type=float, default=0.3, help="the base's share of the blend, 0-1 (default 0.3)")
+    ap.add_argument("--base-curve-b", type=float, default=COVER_B, help="b of the coverage curve that gives ranks their share")
     ap.add_argument("--learned", action="append", default=[], metavar="FILE[:W]",
-                    help="a profile saved by the engine (expert_profile_save), as another ranking at weight W")
+                    help="a profile saved by the engine (expert_profile_save), weight W beside yours+base = 1 (default 0.5)")
+    ap.add_argument("--n-expert", type=int, help="experts per layer (default: the base's, else 512)")
     ap.add_argument("--system-prompt", help="a file: your client's system prompt, put in front of every prompt")
+    ap.add_argument("--tools", help="a JSON file: your client's tool definitions (OpenAI or Anthropic), sent with every prompt")
+    ap.add_argument("--think", action=argparse.BooleanOptionalAction, default=None,
+                    help="--think / --no-think override the server's default (the config's reasoning_effort, else the template's)")
+    ap.add_argument("--tool-turns", action="store_true", help="a tool result is a prompt point too")
+    ap.add_argument("--skip-bad", action="store_true", help="skip and count unreadable input lines instead of stopping")
     ap.add_argument("--max-prompts", type=int, default=40)
     ap.add_argument("--max-new", type=int, default=250, help="tokens decoded per prompt (default 250)")
-    ap.add_argument("--max-turns", type=int, default=12, help="turns of a conversation kept, most recent (default 12)")
-    ap.add_argument("--max-prompt-tokens", type=int, default=8192, help="skip a prompt longer than this (default 8192)")
+    ap.add_argument("--max-turns", type=int, default=12, help="messages of a conversation kept, most recent (default 12)")
+    ap.add_argument("--max-prompt-tokens", type=int, default=20000,
+                    help="skip a prompt longer than this, system prompt included (default 20000)")
+    ap.add_argument("--timeout", type=float, default=900.0, help="seconds an engine run may take (default 900)")
+    ap.add_argument("--max-failed", type=float, default=0.2, help="share of runs that may fail before it is an error")
     ap.add_argument("--top", type=int, default=DEFAULT_TOP, help="pairs the cache holds, for the coverage lines")
     ap.add_argument("--holdout", type=float, default=0.2)
     ap.add_argument("--traces-only", action="store_true", help="no engine: build from the traces already in OUTDIR")
@@ -334,105 +548,165 @@ def main():
         raise SystemExit("--base-weight is a share between 0 and 1")
     if not a.dry_run and not a.out:
         raise SystemExit("--out PATH is required (the profile to write)")
-    out = Path(a.out) if a.out else Path("expert-profile-personal.bin")
-    outdir = Path(a.outdir) if a.outdir else out.with_name(out.name + ".traces")
-    base_ranked = [] if a.no_base else mp.read_profile(a.base)
+    config_path = Path(a.config)
+    if config_path.is_dir() or not config_path.is_file():
+        raise SystemExit(f"{a.config}: the first argument is the run config (strata-*.json), a file")
+    try:
+        cfg = json.loads(config_path.read_text(encoding="utf-8-sig"))
+        cfg["exe"], cfg["args"], cfg["tokenizer"]
+    except (ValueError, KeyError, TypeError) as e:
+        raise SystemExit(f"{a.config}: not a run config ({e})")
+    out = Path(a.out if a.out else "expert-profile-personal.bin").resolve()
+    outdir = Path(a.outdir).resolve() if a.outdir else out.with_name(out.name + ".traces")
+
+    ne = a.n_expert or (profile_n_expert(a.base) if not a.no_base else None) or mp.N_EXPERT
+    base_ranked = [] if a.no_base else mp.read_profile(a.base, ne)
     learned = []
     for spec in a.learned:
         path, w = parse_learned(spec)
-        learned.append((mp.read_profile(path), w))
+        learned.append((mp.read_profile(path, ne), w))
 
-    traces = []
-    if a.traces_only:
-        files = sorted(outdir.glob("p*.trace"))
-        if not files:
-            raise SystemExit(f"{outdir}: no p*.trace files")
-        traces = [(f.name, mp.read_trace(f)) for f in files]
-        plan = None
-    else:
-        if not a.sources:
-            raise SystemExit("name at least one SOURCE (a folder or a file of prompts), or use --traces-only")
-        convs = []
-        for s in a.sources:
+    items = []                                   # (trace name, conversation id, {pair: count})
+    failed = 0
+    try:
+        if a.traces_only:
+            files = sorted(outdir.glob("p*.trace"))
+            if not files:
+                raise SystemExit(f"{outdir}: no p*.trace files")
             try:
-                convs += load_conversations(s)
-            except (FileNotFoundError, ValueError) as e:
-                raise SystemExit(str(e))
-        points = prompt_points(convs)
-        if not points:
-            raise SystemExit("no user prompt found in the sources")
-        chosen = pick_evenly(points, a.max_prompts)
-        system = Path(a.system_prompt).read_text(encoding="utf-8") if a.system_prompt else None
-        cfg_path = find_config(a.config)
-        cfg = json.loads(cfg_path.read_text(encoding="utf-8-sig"))
-        import collect_profile_traces as C
-        tok = C.load_tokenizer(cfg["tokenizer"])
-        sys_ids = tok.encode(f"<|im_start|>system\n{system}<|im_end|>\n", parse_special=True) if system else []
-        plan = []
-        for i, conv in enumerate(chosen):      # the system prompt is tokenized once: it is the same in front of all
-            ids = sys_ids + tok.encode(render_prompt(conv, None, a.max_turns), parse_special=True)
-            plan.append((i, ids))
-        too_long = [i for i, ids in plan if len(ids) - len(sys_ids) > a.max_prompt_tokens]
-        plan = [(i, ids) for i, ids in plan if i not in too_long]
-        n_tok = [len(ids) for _, ids in plan]
-        done = sum(1 for i, _ in plan if (outdir / f"p{i:03d}.trace").exists() and (outdir / f"p{i:03d}.trace").stat().st_size)
-        print(f"{len(convs)} conversations, {len(points)} user turns, {len(chosen)} chosen, {len(too_long)} over "
-              f"--max-prompt-tokens skipped -> {len(plan)} prompts to run ({done} already traced)")
-        if n_tok:
-            print(f"prompt tokens: min {min(n_tok)}, median {sorted(n_tok)[len(n_tok) // 2]}, max {max(n_tok)}")
-        left = len(plan) - done
-        print(f"engine runs: {left} x (start-up 20-60 s + prefill + decode {a.max_new} tokens): roughly "
-              f"{left * 35 // 60}-{left * 80 // 60} minutes; the GPU must be free (stop the server)")
-        print(f"traces -> {outdir}; profile -> {out}; ranking: yours {1 - a.base_weight if base_ranked else 1:.2f}"
-              f"{f', base {a.base_weight:.2f}' if base_ranked else ''}"
-              f"{''.join(f', learned {Path(p).name} {w}' for p, w in map(parse_learned, a.learned))}")
-        if plan:
-            tf = outdir / "p000.tok"
-            print("first run: " + " ".join(engine_command(cfg, tf, a.max_new, outdir / "p000.trace")))
-        if a.dry_run:
-            print("dry run: nothing started, nothing written")
-            return
-        if not a.force and server_listening(cfg.get("port", 8080)):
-            raise SystemExit(f"something listens on 127.0.0.1:{cfg.get('port', 8080)}: stop the server first (or --force)")
-        outdir.mkdir(parents=True, exist_ok=True)
-        env = engine_env(cfg)
-        for i, ids in plan:
-            trace = outdir / f"p{i:03d}.trace"
-            if not (trace.exists() and trace.stat().st_size):
-                tf = outdir / f"p{i:03d}.tok"
-                tf.write_text(",".join(str(t) for t in ids))
-                print(f"[{i + 1}/{len(plan)}] {len(ids)} prompt tokens", flush=True)
-                r = subprocess.run(engine_command(cfg, tf, a.max_new, trace), cwd=cfg.get("cwd") or None, env=env,
-                                   capture_output=True, text=True)
-                if r.returncode != 0 or not trace.exists():
-                    print(f"  failed (rc {r.returncode}): {r.stderr[-300:]}", file=sys.stderr)
-                    sys.exit(1)
-        traces = [(f"p{i:03d}.trace", mp.read_trace(outdir / f"p{i:03d}.trace")) for i, _ in plan]
+                groups = json.loads((outdir / "plan.json").read_text())
+            except (OSError, ValueError):
+                groups = {}
+            for f in files:
+                items.append((f.name, groups.get(f.name, f.name), read_trace_checked(f, ne)))
+        else:
+            if not a.sources:
+                raise SystemExit("name at least one SOURCE (a folder or a file of prompts), or use --traces-only")
+            convs, bad = [], []
+            for s in a.sources:
+                try:
+                    convs += load_conversations(s, a.skip_bad, bad)
+                except (FileNotFoundError, ValueError) as e:
+                    raise SystemExit(str(e))
+            points = prompt_points(convs, a.tool_turns)
+            if not points:
+                raise SystemExit("no user prompt found in the sources")
+            chosen = pick_evenly(points, a.max_prompts)
+            system = Path(a.system_prompt).read_text(encoding="utf-8") if a.system_prompt else None
+            tools = json.loads(Path(a.tools).read_text(encoding="utf-8-sig")) if a.tools else None
+            try:
+                rend = Renderer(cfg["tokenizer"], cfg, a.think)
+            except ImportError as e:
+                raise SystemExit(f"the server's renderer needs its Python packages ({e}); use the Strata venv")
+            max_ctx = arg_value(cfg["args"], "--max-context")
+            max_ctx = int(max_ctx) if max_ctx and max_ctx.isdigit() else None
+            plan, skipped = [], defaultdict(int)
+            for i, (ci, req) in enumerate(chosen):
+                try:
+                    ids = rend.encode(req, system, tools, a.max_turns)
+                except ValueError as e:                 # the template or the converter refused these messages
+                    skipped[f"refused by the server's renderer ({e})"] += 1
+                    continue
+                if len(ids) > a.max_prompt_tokens:
+                    skipped["over --max-prompt-tokens"] += 1
+                elif max_ctx and len(ids) + a.max_new > max_ctx:
+                    skipped[f"prompt + --max-new over the config's --max-context {max_ctx}"] += 1
+                else:
+                    plan.append((i, ci, ids))
+            n_tok = [len(ids) for _, _, ids in plan]
+            done = 0
+            for i, _, ids in plan:
+                tf, tr = outdir / f"p{i:03d}.tok", outdir / f"p{i:03d}.trace"
+                if tr.exists() and tr.stat().st_size and tf.exists() and tf.read_text() == ",".join(map(str, ids)):
+                    done += 1
+            print(f"{len(convs)} conversations, {len(points)} prompt points, {len(chosen)} chosen -> {len(plan)} to run "
+                  f"({done} already traced)" + (f"; {len(bad)} unreadable lines skipped" if bad else ""))
+            for why, n in skipped.items():
+                print(f"  skipped {n}: {why}")
+            if n_tok:
+                print(f"prompt tokens (system prompt and tools included): min {min(n_tok)}, median "
+                      f"{sorted(n_tok)[len(n_tok) // 2]}, max {max(n_tok)}; thinking: {rend.kwargs or 'the template default'}")
+            left = len(plan) - done
+            print(f"engine runs: {left} x (start-up 20-60 s + prefill + decode {a.max_new} tokens): roughly "
+                  f"{left * 35 // 60}-{left * 80 // 60} minutes; the GPU must be free (stop the server)")
+            mix = f"yours {1 - a.base_weight:.2f}, base {a.base_weight:.2f}" if base_ranked else "yours alone"
+            print(f"traces -> {outdir}; profile -> {out}; ranking: {mix}"
+                  f"{''.join(f', learned {Path(p).name} {w}' for p, w in map(parse_learned, a.learned))} (scaled to add up to 1)")
+            if plan:
+                print("first run: " + " ".join(engine_command(cfg, config_path, outdir / "p000.run", a.max_new,
+                                                                outdir / "p000.trace.part")))
+            if a.dry_run:
+                print("dry run: nothing started, nothing written")
+                return
+            if not plan:
+                raise SystemExit("no prompt is left to run")
+            outdir.mkdir(parents=True, exist_ok=True)
+            (outdir / "plan.json").write_text(json.dumps({f"p{i:03d}.trace": f"c{ci}" for i, ci, _ in plan}))
+            env, cwd = engine_env(cfg), cfg.get("cwd") or None
+            for i, ci, ids in plan:
+                trace, part = outdir / f"p{i:03d}.trace", outdir / f"p{i:03d}.trace.part"
+                tf, run = outdir / f"p{i:03d}.tok", outdir / f"p{i:03d}.run"
+                text = ",".join(map(str, ids))
+                if trace.exists() and trace.stat().st_size and tf.exists() and tf.read_text() == text:
+                    continue
+                busy = None if a.force else listening(cfg)
+                if busy:
+                    raise SystemExit(f"something listens on {busy}: stop the server first (or --force)")
+                trace.unlink(missing_ok=True)
+                tf.unlink(missing_ok=True)
+                run.write_text(text)
+                print(f"[{i + 1}/{len(chosen)}] {len(ids)} prompt tokens", flush=True)
+                try:
+                    rc, tail = run_engine(engine_command(cfg, config_path, run, a.max_new, part), cwd, env, a.timeout)
+                    ok = rc == 0 and part.exists() and part.stat().st_size > 0
+                    if ok:
+                        os.replace(part, trace)
+                        tf.write_text(text)
+                finally:
+                    part.unlink(missing_ok=True)
+                    run.unlink(missing_ok=True)
+                if not ok:
+                    failed += 1
+                    print(f"  failed ({'timeout' if rc is None else 'rc %s' % rc}); the engine said:\n    "
+                          + tail.strip().replace("\n", "\n    "), file=sys.stderr)
+            if failed > a.max_failed * len(plan):
+                raise SystemExit(f"{failed} of {len(plan)} runs failed: no profile written (finished traces kept in {outdir})")
+            for i, ci, ids in plan:
+                f = outdir / f"p{i:03d}.trace"
+                if f.exists():
+                    items.append((f.name, f"c{ci}", read_trace_checked(f, ne)))
+            if failed:
+                print(f"{failed} of {len(plan)} runs failed and were skipped")
+    except ValueError as e:
+        raise SystemExit(str(e))
 
-    freqs = [f for _, f in traces if f]
+    items = [it for it in items if it[2]]
     if a.dry_run:
-        print(f"dry run: {len(freqs)} traces found in {outdir}; nothing written")
+        print(f"dry run: {len(items)} traces found in {outdir}; nothing written")
         return
-    if not freqs:
+    if not items:
         raise SystemExit("every trace is empty")
-    train, held = split_holdout(freqs, a.holdout)
-    if held and base_ranked:
-        trial = personal_ranking(train, base_ranked, a.base_weight, learned)
-        h = pooled(held)
-        print(f"held out {len(held)} of {len(freqs)} prompts: the top {a.top} pairs cover "
+    freqs = [f for _, _, f in items]
+    held = split_holdout([g for _, g, _ in items], a.holdout)
+    train = [f for f, h in zip(freqs, held) if not h]
+    test = [f for f, h in zip(freqs, held) if h]
+    if test and base_ranked:
+        trial = personal_ranking(train, base_ranked, a.base_weight, learned, ne, a.base_curve_b)
+        h = pooled(test)
+        print(f"held out {len(test)} of {len(freqs)} traces (whole conversations): the top {a.top} pairs cover "
               f"{coverage(base_ranked, h, a.top):.1%} of their routing with the base, "
               f"{coverage(trial, h, a.top):.1%} with a profile from the other {len(train)} (offline coverage, not the hit rate)")
-    ranked = personal_ranking(freqs, base_ranked, a.base_weight, learned)
+    ranked = personal_ranking(freqs, base_ranked, a.base_weight, learned, ne, a.base_curve_b)
     out.parent.mkdir(parents=True, exist_ok=True)
-    mp.write_profile(out, ranked)
-    assert mp.read_profile(out) == ranked, "the profile did not survive the round trip"
+    mp.write_profile(out, ranked, ne)
+    assert mp.read_profile(out, ne) == ranked, "the profile did not survive the round trip"
     allf = pooled(freqs)
     msg = f"wrote {out}: {len(ranked)} ranked pairs from {len(freqs)} traces"
     if base_ranked:
         msg += (f"; {len(set(ranked[:a.top]) & set(base_ranked[:a.top]))} of the top {a.top} are the base's "
                 f"(in-sample coverage of your traces: {coverage(base_ranked, allf, a.top):.1%} -> {coverage(ranked, allf, a.top):.1%})")
     print(msg)
-    print(f"use it: set \"--expert-profile\" in your config to {out.resolve()} and restart the server")
+    print(f"use it: set \"--expert-profile\" in your config to {out} and restart the server")
 
 
 if __name__ == "__main__":

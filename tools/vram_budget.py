@@ -19,8 +19,9 @@ the verify windows take.  Give them as `--free-gib` (the "expert cache auto: X G
 
 Not modelled: KV streaming (`--kv-resident`: the K/V then lives in RAM), a layer split, `--no-kv-grow` (the whole K/V is then
 taken at start: use the table's cost at --max-context), the drafter's own K/V.  The K/V bytes are the formula times
-KV_OVERHEAD, calibrated on one engine log (int8: 1.68 GiB at 131,072 cells, which it matches; 3.35 GiB at 262,144, which it
-undershoots by 2%); the other formats are the formula alone.  On that log the table's cost at 131,072 cells (7,684 experts
+KV_OVERHEAD for int8, calibrated on one engine log (1.68 GiB at 131,072 cells, which it matches; 3.35 GiB at 262,144,
+which it undershoots by 2%); k8v4 and q4_0 are the formula alone (no overhead applied: the real ones are likely a few percent
+higher).  On that log the table's cost at 131,072 cells (7,684 experts
 left) is the engine's own figure (7,684 of 8,441 slots hold experts).  The output is an estimate, not a measurement.
 """
 import argparse
@@ -54,9 +55,14 @@ def kv_bytes_per_cell(kv):
     return per_layer * N_QSA_LAYERS
 
 
+def kv_overhead(kv):
+    """The overhead factor: calibrated on an int8 log only, so the other formats get the bare formula (1.0)."""
+    return KV_OVERHEAD if kv == "int8" else 1.0
+
+
 def kv_bytes(kv, cells):
-    """K/V bytes for `cells` cells, including the overhead calibrated on the int8 log."""
-    return int(kv_bytes_per_cell(kv) * cells * KV_OVERHEAD)
+    """K/V bytes for `cells` cells: the pools' formula, times the int8-calibrated overhead for int8 only."""
+    return int(kv_bytes_per_cell(kv) * cells * kv_overhead(kv))
 
 
 def read_native_blobs(path):
@@ -87,18 +93,36 @@ def pairs_in_budget(ranked, blobs, budget_bytes):
     return len(ranked)
 
 
-def parse_log_anchor(text):
-    """(free_gib, reserve_mib, draft_mib, slots) of the LAST `expert cache auto:` line of an engine log, or None."""
-    rx = re.compile(r"expert cache auto: ([0-9.]+) GiB free, (\d+) MiB reserved \(\+(\d+) MiB for the draft head\) -> (\d+) slots")
-    last = None
-    for m in rx.finditer(text):
-        last = m
-    return None if last is None else (float(last.group(1)), int(last.group(2)), int(last.group(3)), int(last.group(4)))
+AUTO_RX = re.compile(r"expert cache auto: ([0-9.]+) GiB free, (\d+) MiB reserved \(\+(\d+) MiB for the draft head\) -> (\d+) slots")
+
+
+def log_starts(text):
+    """[(line number, (free_gib, reserve_mib, draft_mib, slots))] the FIRST 'expert cache auto:' line of each engine start
+    in a log (a start is a '[strata] ... engine started:' line; a log with none is one start)."""
+    starts, cur, seen = [], 0, False
+    for n, line in enumerate(text.splitlines(), 1):
+        if "engine started:" in line:
+            cur += 1
+            seen = False
+        m = AUTO_RX.search(line)
+        if m and not seen:
+            seen = True
+            starts.append((n, (float(m.group(1)), int(m.group(2)), int(m.group(3)), int(m.group(4)))))
+    return starts
+
+
+def parse_log_anchor(text, start=-1):
+    """(line number, (free_gib, reserve_mib, draft_mib, slots)) of start number `start` (1-based; -1 the last), or None."""
+    starts = log_starts(text)
+    if not starts or not (-len(starts) <= start <= len(starts)) or start == 0:
+        return None
+    return starts[start - 1] if start > 0 else starts[start]
 
 
 def other_mib(anchor, max_blob):
-    """What the start took besides the reserve, the draft head and the slots: the prompt path's buffers and the verify
-    windows (not printed by the engine, so worked out from the line)."""
+    """MiB of the free VRAM that the start line does not account for: free - reserve - draft head - slots x the largest
+    blob.  The engine does not print it; it is the prompt path's buffers and the verify windows, plus rounding, and is
+    near 0 when the prompt path borrows cache slots (the default with a profile)."""
     free_gib, reserve, draft, slots = anchor
     return free_gib * 1024 - reserve - draft - slots * max_blob / MIB
 
@@ -128,9 +152,12 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--pack", required=True, help="the pack directory (reads native_experts.txt)")
     ap.add_argument("--profile", default=str(ROOT / "data" / "expert-profile.bin"))
-    ap.add_argument("--from-log", help="an engine log: the last 'expert cache auto:' line anchors the free VRAM")
+    ap.add_argument("--from-log", help="an engine log: an 'expert cache auto:' line anchors the free VRAM")
+    ap.add_argument("--start", type=int, default=-1,
+                    help="which engine start of the log (1-based, -1 = the last, the default); its first such line is read")
     ap.add_argument("--free-gib", type=float, help="the 'GiB free' figure of the engine's start-up line")
-    ap.add_argument("--other-mib", type=float, help="the prompt path's buffers and verify windows (default: from the log)")
+    ap.add_argument("--other-mib", type=float, help="MiB of the free VRAM beside reserve, draft head and slots (default: "
+                    "worked out from the log line; ~0 when the prompt path borrows cache slots)")
     ap.add_argument("--vram-reserve-mib", type=int, default=None, help="the reserve to plan with (default 700; the log's own)")
     ap.add_argument("--draft-mib", type=int, default=None, help="the draft head's MiB (default: the log's, else 98)")
     ap.add_argument("--kv", choices=("int8", "k8v4", "q4_0"), default="int8")
@@ -142,13 +169,17 @@ def main():
     contexts = [int(x) for x in a.contexts.split(",") if x.strip()]
     print(f"expert blobs: {min(blobs) / MIB:.2f}-{max(blobs) / MIB:.2f} MiB per expert "
           f"(mean {sum(blobs) / len(blobs) / MIB:.2f}); the profile ranks {len(ranked)} pairs")
-    print(f"K/V {a.kv}: {kv_bytes_per_cell(a.kv):,} B per cell x {KV_OVERHEAD} = "
+    print(f"K/V {a.kv}: {kv_bytes_per_cell(a.kv):,} B per cell x {kv_overhead(a.kv)} = "
           f"{kv_bytes(a.kv, 1):,} B with the overhead; "
           f"{kv_bytes(a.kv, 262144) / GIB:.2f} GiB at 262,144 cells")
 
-    anchor = parse_log_anchor(Path(a.from_log).read_text(encoding="utf-8", errors="replace")) if a.from_log else None
+    anchor_line = parse_log_anchor(Path(a.from_log).read_text(encoding="utf-8", errors="replace"), a.start) if a.from_log else None
+    anchor = anchor_line[1] if anchor_line else None
     if a.from_log and anchor is None:
-        print(f"{a.from_log}: no 'expert cache auto:' line; give --free-gib and --other-mib", file=sys.stderr)
+        print(f"{a.from_log}: no 'expert cache auto:' line for start {a.start}; give --free-gib and --other-mib", file=sys.stderr)
+    if anchor_line:
+        print(f"anchor: {a.from_log} line {anchor_line[0]} (start {a.start}): {anchor[0]:.2f} GiB free = "
+              f"{anchor[0] * 1024:.0f} MiB, {anchor[1]} MiB reserved, {anchor[2]} MiB draft head, {anchor[3]} slots")
     free = a.free_gib if a.free_gib is not None else (anchor[0] if anchor else None)
     reserve = a.vram_reserve_mib if a.vram_reserve_mib is not None else (anchor[1] if anchor else 700)
     draft = a.draft_mib if a.draft_mib is not None else (anchor[2] if anchor else 98)
@@ -158,7 +189,7 @@ def main():
         print("no anchor for the free VRAM: absolute counts not printed (pass --from-log, or --free-gib and --other-mib)")
     else:
         held = experts_held(ranked, blobs, free, reserve, draft, other)
-        print(f"start: {free:.2f} GiB free, {reserve} MiB reserve, {draft} MiB draft head, {other:.0f} MiB prompt path/windows "
+        print(f"start: {free * 1024:.0f} MiB free, {reserve} MiB reserve, {draft} MiB draft head, {other:.0f} MiB not accounted "
               f"-> {held} experts in VRAM ({held / len(ranked):.0%} of the model's) before the K/V grows")
         if anchor:
             print(f"  (the log's own start: {anchor[3]} auto slots of the largest blob; this walk, at the log's reserve, "

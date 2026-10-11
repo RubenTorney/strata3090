@@ -100,6 +100,7 @@ std::string variant_name(int v) {
     if (v == 0) return "scalar";
     std::string s;
     if (v & cpu::kIq256Gather) s += "gather";
+    if (v & cpu::kIq256Zen3) s += s.empty() ? "zen3" : "+zen3";
     if (v & cpu::kIq256Vnni) s += s.empty() ? "vnni" : "+vnni";
     return s;
 }

@@ -12,9 +12,14 @@ build, so (1) "bit-identical" can be checked end to end, and (2) speed is compar
                           per-prompt decode ratio against the first arm, its median and the prompts-faster count; a prompt
                           whose text differs is marked "text diverged" and left out of the ratio
 
-The server returns text, not token ids: a hash is taken over the answer text and the completion token count.
+The server returns text, not token ids: a hash is taken over the answer text, the finish reason and the completion token count.
+Equal hashes mean "the same text over N tokens", not a proof of bit-identical logits.  An empty answer is an error.
 
-Arms: --arm 'NAME;exe=/path/to/strata;arg=--pcie-frac 0.5;env=STRATA_X=1' (repeat ; the first arm is the baseline).  Without
+BEFORE A RUN: stop the live server.  One engine needs about 52 GB of RAM and most of the GPU; two do not fit in 62 GiB, and the
+script refuses to start an engine when MemAvailable is below --min-free-ram-gb (default 50) or the free VRAM is far below what
+`probe` saw, rather than risk the OOM killer.
+
+Arms: --arm 'NAME;exe=/path/to/strata;arg=--adapt-swaps 40;env=STRATA_X=1' (repeat ; the first arm is the baseline).  Without
 --arm there is one arm, "base".  Every engine is a fresh `serve/server.py --engine strata` started by this script in its own
 process group and stopped through that group (and the processes under it): nothing is ever found or stopped by name.
 
@@ -33,6 +38,7 @@ import shlex
 import signal
 import socket
 import statistics
+import ctypes
 import subprocess
 import sys
 import time
@@ -45,6 +51,10 @@ LINE = re.compile(r"prompt (\d+) tokens = (\d+) reused \+ (\d+)(?: of \d+)? read
                   r"(\d+) ms \(([\d.]+) tok/s\)(?:, drafts accepted (\d+) of (\d+))?")
 CACHE_LINE = re.compile(r"expert cache (\d+) slots")
 CHUNK_LINE = re.compile(r"prompt chunk auto: (\d+) tokens")
+PIN_LINE = re.compile(r"cudaHostRegister|registered for the GPU|pin by need|page-locked")
+STRIP_KEYS = ("expert_profile_save", "expert_profile_save_every", "slot_save_path", "idle_unload_s", "lazy_load", "parallel",
+              "replicas", "api_key", "before_load", "vram_elastic", "mcp_servers", "mcp")
+STRIP_FLAGS = {"--vram-elastic": False, "--expert-profile-save": True, "--slot-save-path": True}
 NOTE = re.compile(r"STRATA_DETERMINISTIC|\bERR\b|WARNING|tail skip|STRATA_ROUTE_TAIL_SKIP|adaptive tier|--adapt-async|pcie_frac")
 
 COLD = [
@@ -83,15 +93,26 @@ def parse_startup(text: str) -> dict:
         out["expert_cache"] = int(m[1])
     for m in CHUNK_LINE.finditer(text):
         out["prefill_chunk"] = int(m[1])
+    out["pin"] = [l.strip()[:200] for l in text.splitlines() if PIN_LINE.search(l)]
     return out
 
 
-def answer_hash(text: str, completion_tokens: int | None) -> str:
-    """The server gives text, not token ids: the text and the token count identify the answer."""
+def answer_hash(text: str, completion_tokens: int | None, finish: str | None = None, reasoning: str = "") -> str:
+    """The server gives text, not token ids: the text, the reasoning text, the finish reason and the token count stand for the
+    answer ("the same text over N tokens").  An empty answer is an error, not a match."""
+    if not text and not reasoning:
+        raise ValueError("empty answer")
     h = hashlib.sha256()
-    h.update(text.encode("utf-8"))
-    h.update(b"\x00%d" % (-1 if completion_tokens is None else completion_tokens))
+    for part in (text, reasoning, finish or ""):
+        h.update(part.encode("utf-8"))
+        h.update(b"\x00")
+    h.update(b"%d" % (-1 if completion_tokens is None else completion_tokens))
     return h.hexdigest()[:16]
+
+
+def pin_mismatch(startups: list[dict]) -> bool:
+    """The engines' log lines about the registered / page-locked arena differ (a different pinned prefix is a different split)."""
+    return len({tuple(s.get("pin", [])) for s in startups}) > 1
 
 
 def median(xs: list[float]) -> float:
@@ -118,8 +139,12 @@ def paired_speed(base: dict[int, dict], arm: dict[int, dict]) -> dict:
     ratios: dict[int, float] = {}
     diverged: list[int] = []
     nospeed: list[int] = []
+    mixed: list[int] = []
     for i in sorted(set(base) & set(arm)):
         b, a = base[i], arm[i]
+        if b["hash"].startswith("*mixed*") or a["hash"].startswith("*mixed*"):
+            mixed.append(i)       # repeats of one arm disagree: not self-consistent, never paired
+            continue
         if b["hash"] != a["hash"]:
             diverged.append(i)
             continue
@@ -129,7 +154,7 @@ def paired_speed(base: dict[int, dict], arm: dict[int, dict]) -> dict:
         ratios[i] = median(a["tps"]) / median(b["tps"])
     vals = list(ratios.values())
     return dict(ratios=ratios, median=median(vals) if vals else float("nan"), faster=sum(v > 1.0 for v in vals), n=len(vals),
-                diverged=diverged, nospeed=nospeed)
+                diverged=diverged, nospeed=nospeed, mixed=mixed)
 
 
 def merge_hash(per_round: list[tuple[str, float | None]]) -> dict:
@@ -181,9 +206,45 @@ def apply_args(args: list, overrides: dict) -> list:
     return a
 
 
+def strip_flags(args: list) -> list:
+    out, i = [], 0
+    while i < len(args):
+        a = args[i]
+        if a in STRIP_FLAGS:
+            i += 2 if STRIP_FLAGS[a] else 1
+            continue
+        out.append(a)
+        i += 1
+    return out
+
+
+def arm_conflicts(arm: dict, deterministic: bool) -> list[str]:
+    """Settings of an arm that bring back what the deterministic mode removes."""
+    if not deterministic:
+        return []
+    bad = []
+    for flag in ("--suffix-draft", "--lookup-chain"):
+        if arm["args"].get(flag) not in (None, "0"):
+            bad.append(f"{flag} {arm['args'][flag]}")
+    if arm["args"].get("--expert-cache") == "auto":
+        bad.append("--expert-cache auto")
+    if arm["args"].get("--prefill") == "auto":
+        bad.append("--prefill auto")
+    env = arm["env"]
+    for k, v in (("STRATA_DETERMINISTIC", None), ("STRATA_PREFILL_CPU_SHARE", "auto"), ("STRATA_ADAPT_ASYNC_WAIT", "0"),
+                 ("STRATA_ADAPT_NOWAIT", "1"), ("STRATA_ADAPT_PICK_INLINE", "0"), ("STRATA_FS_SLOTS", None)):
+        if k in env and (v is None or env[k] == v) and not (k == "STRATA_DETERMINISTIC" and env[k] == "1"):
+            bad.append(f"{k}={env[k]}")
+    return bad
+
+
 def build_config(base: dict, arm: dict, det: dict, exe: str | None, log: str, port: int) -> dict:
     """The run config of one engine: the base config, the deterministic bundle, then the arm's own settings (the arm wins)."""
     cfg = copy.deepcopy(base)
+    for k in STRIP_KEYS:     # server features that write files, unload the model, open the network or start other programs
+        cfg.pop(k, None)
+    cfg["host"] = "127.0.0.1"
+    cfg["args"] = strip_flags(cfg.get("args", []))
     if exe or arm.get("exe"):
         cfg["exe"] = arm.get("exe") or exe
     cfg["args"] = apply_args(apply_args(cfg.get("args", []), det.get("args", {})), arm.get("args", {}))
@@ -200,6 +261,7 @@ def det_bundle(cache_slots: int | None, prefill_chunk: int | None, pcie_frac: st
     if deterministic:
         env["STRATA_DETERMINISTIC"] = "1"
         env["STRATA_ROUTE_TAIL_SKIP"] = tail_skip
+        env["STRATA_PREFILL_CPU_SHARE"] = "0"       # unset = auto below 1024 tokens (timed means)
         args["--suffix-draft"] = "0"
         args["--lookup-chain"] = "0"
     if cache_slots:
@@ -264,11 +326,44 @@ def free_ram_gb() -> float:
     return 0.0
 
 
+def free_vram_mib() -> int | None:
+    """Free VRAM of GPU 0 from nvidia-smi (a query, no CUDA context), or None when it cannot be read."""
+    try:
+        out = subprocess.run(["nvidia-smi", "--query-gpu=memory.free", "--format=csv,noheader,nounits", "-i", "0"],
+                             capture_output=True, text=True, timeout=20)
+        return int(out.stdout.strip().splitlines()[0]) if out.returncode == 0 else None
+    except (OSError, ValueError, IndexError, subprocess.TimeoutExpired):
+        return None
+
+
+def starttime(pid: int) -> str | None:
+    try:
+        return Path(f"/proc/{pid}/stat").read_text().rsplit(")", 1)[1].split()[19]
+    except (OSError, IndexError):
+        return None
+
+
+def _die_with_parent() -> None:
+    """In the child, before exec: SIGKILL when this script dies, so a killed driver cannot orphan an engine."""
+    try:
+        ctypes.CDLL("libc.so.6", use_errno=True).prctl(1, signal.SIGKILL, 0, 0, 0)    # PR_SET_PDEATHSIG
+    except Exception:
+        pass
+
+
+def install_signal_handlers() -> None:
+    def bye(signum, _frame):
+        raise SystemExit(128 + signum)
+    for sig in (signal.SIGTERM, signal.SIGHUP):
+        signal.signal(sig, bye)
+
+
 class Engine:
     """One fresh `server.py --engine strata`, in its own process group, stopped through it."""
 
     def __init__(self, ctx: argparse.Namespace, tag: str, cfg: dict):
         self.ctx, self.tag = ctx, tag
+        self.proc = None
         work = Path(ctx.workdir)
         work.mkdir(parents=True, exist_ok=True)
         self.log = work / f"ab_{tag}.log"
@@ -279,31 +374,41 @@ class Engine:
         cfg_path.write_text(json.dumps(cfg, indent=1), encoding="utf-8")
         self.port = cfg["port"]
         if not wait_until(f"port {self.port} to be free", lambda: not port_in_use(self.port), ctx.wait_port):
-            raise SystemExit(f"port {self.port} is in use (another server or engine): not starting; choose --port")
+            raise SystemExit(f"port {self.port} is in use (another server or engine): not starting; stop it or choose --port")
         if ctx.min_free_ram_gb and not wait_until(f"{ctx.min_free_ram_gb} GB of free RAM", lambda: free_ram_gb() >= ctx.min_free_ram_gb,
                                                   ctx.wait_ram):
-            raise SystemExit("not enough free RAM")
+            raise SystemExit(f"MemAvailable {free_ram_gb():.1f} GB < {ctx.min_free_ram_gb} GB: another engine is running? Stop the live "
+                             f"server first (two engines do not fit); not starting")
+        check_vram(ctx)
         py = Path(ctx.install_dir) / ".venv" / "bin" / "python"
         print(f"[{tag}] start, free RAM {free_ram_gb():.1f} GB", flush=True)
+        outf = open(self.out, "wb")
         self.proc = subprocess.Popen([str(py if py.exists() else sys.executable), "serve/server.py", "--engine", "strata",
                                       "--config", str(cfg_path), "--port", str(self.port)], cwd=ctx.install_dir,
-                                     stdout=open(self.out, "wb"), stderr=subprocess.STDOUT, start_new_session=True)
+                                     stdout=outf, stderr=subprocess.STDOUT, start_new_session=True, preexec_fn=_die_with_parent)
+        outf.close()
         self.pgid = self.proc.pid       # start_new_session: the group id is the child's pid
-        t0 = time.monotonic()
+        self.tree: dict[int, str | None] = {}
+        try:
+            t0 = time.monotonic()
 
-        def up() -> bool:
-            try:
-                urllib.request.urlopen(f"http://127.0.0.1:{self.port}/v1/models", timeout=5).read()
+            def up() -> bool:
+                try:
+                    urllib.request.urlopen(f"http://127.0.0.1:{self.port}/v1/models", timeout=5).read()
+                except Exception:
+                    return False
+                if self.proc.poll() is not None:     # something else answers on our port
+                    raise SystemExit(f"[{tag}] our server exited but port {self.port} answers: a foreign listener; stopping")
                 return True
-            except Exception:
-                return False
-        if not wait_until("the server to answer", up, ctx.wait_start, 3.0, abort=lambda: self.proc.poll() is not None) or self.proc.poll() is not None:
-            tail = self.out.read_bytes()[-1500:].decode("utf-8", "replace")
-            self.stop()
-            raise SystemExit(f"[{tag}] server did not start\n{tail}")
-        print(f"[{tag}] up after {time.monotonic() - t0:.0f} s", flush=True)
-        for i, p in enumerate(WARM):
-            self.ask(p, max_tokens=48)
+            if not wait_until("the server to answer", up, ctx.wait_start, 3.0, abort=lambda: self.proc.poll() is not None):
+                tail = self.out.read_bytes()[-1500:].decode("utf-8", "replace")
+                raise SystemExit(f"[{tag}] server did not start\n{tail}")
+            print(f"[{tag}] up after {time.monotonic() - t0:.0f} s", flush=True)
+            for p in WARM:
+                self.ask(p, max_tokens=48)
+        except BaseException:
+            self.stop(quiet=True)
+            raise
 
     def ask(self, prompt: str, max_tokens: int = 256, temperature: float = 0.0, seed: int | None = None) -> dict:
         req = {"model": "strata", "messages": [{"role": "user", "content": prompt}], "max_tokens": max_tokens,
@@ -315,12 +420,17 @@ class Engine:
                                    {"Content-Type": "application/json"})
         with urllib.request.urlopen(r, timeout=self.ctx.request_timeout) as resp:
             body = json.loads(resp.read())
-        text = body["choices"][0]["message"].get("content") or ""
+        msg = body["choices"][0]["message"]
+        text = msg.get("content") or ""
         n = (body.get("usage") or {}).get("completion_tokens")
-        row: dict = dict(text_len=len(text), hash=answer_hash(text, n), notes=[])
+        try:
+            h = answer_hash(text, n, body["choices"][0].get("finish_reason"), msg.get("reasoning_content") or "")
+        except ValueError:
+            raise SystemExit(f"[{self.tag}] empty answer to {prompt[:40]!r}: the engine failed or the prompt was refused")
+        row: dict = dict(text_len=len(text), hash=h, notes=[])
         got: dict | None = None
-        # the engine writes its line just after the reply: wait for it, bounded
-        def line_there() -> bool:
+
+        def line_there() -> bool:          # the engine writes its line just after the reply: wait for it, bounded
             nonlocal got
             for line in self.log.read_bytes()[start:].decode("utf-8", "replace").splitlines():
                 got = parse_engine_line(line) or got
@@ -336,27 +446,43 @@ class Engine:
     def startup(self) -> dict:
         return parse_startup(self.log.read_bytes().decode("utf-8", "replace"))
 
-    def stop(self) -> None:
-        """SIGTERM then SIGKILL to this engine's process group and the processes below the server; each wait is bounded."""
-        mine = set(descendants(self.proc.pid, proc_table())) | {self.proc.pid}
+    def stop(self, quiet: bool = False) -> None:
+        """SIGTERM then SIGKILL to this engine's process group only; each wait is bounded.  Raises when a process that was under
+        the server is still alive afterwards (a 50 GB engine must not be left behind)."""
+        if self.proc is None:
+            return
+        for pid in descendants(self.proc.pid, proc_table()) + [self.proc.pid]:
+            self.tree.setdefault(pid, starttime(pid))
+
+        def alive() -> list[int]:
+            return [p for p, st in self.tree.items() if st is not None and starttime(p) == st
+                    and not (p == self.proc.pid and self.proc.poll() is not None)]
         for sig, wait in ((signal.SIGTERM, 40.0), (signal.SIGKILL, 20.0)):
             try:
                 os.killpg(self.pgid, sig)
             except (ProcessLookupError, PermissionError):
                 pass
-            for pid in mine:        # a child that left the group: only pids seen under our own server
-                try:
-                    os.kill(pid, sig)
-                except (ProcessLookupError, PermissionError):
-                    pass
-            if wait_until("the engine to exit", lambda: self.proc.poll() is not None and not any(
-                    os.path.exists(f"/proc/{p}") and p != self.proc.pid for p in mine), wait):
+            if wait_until("the engine to exit", lambda: self.proc.poll() is not None and not alive(), wait):
                 break
-        try:
-            self.proc.wait(timeout=5)
-        except subprocess.TimeoutExpired:
-            pass
+        left = alive()
         wait_until(f"port {self.port} to close", lambda: not port_in_use(self.port), 30.0)
+        if left:
+            raise RuntimeError(f"[{self.tag}] processes {left} are still alive after SIGKILL to the group: stop them by hand "
+                               f"(they may hold the GPU and ~50 GB of RAM)")
+        self.proc = None
+
+
+def check_vram(ctx: argparse.Namespace) -> None:
+    """Refuse when the free VRAM is far below what `probe` saw (another program is on the card)."""
+    ref = None
+    try:
+        ref = json.loads((Path(ctx.workdir) / "probe.json").read_text()).get("free_vram_mib")
+    except (OSError, ValueError):
+        pass
+    now = free_vram_mib()
+    need = ctx.min_free_vram_mib or (int(ref * 0.9) if ref else 0)
+    if now is not None and need and now < need:
+        raise SystemExit(f"free VRAM {now} MiB < {need} MiB (probe saw {ref}): another program is using the GPU; not starting")
 
 
 # ---------------------------------------------------------------- commands
@@ -369,7 +495,14 @@ def load_base(ctx: argparse.Namespace) -> dict:
 
 
 def arms_of(ctx: argparse.Namespace) -> list[dict]:
-    return [parse_arm(s) for s in (ctx.arm or ["base"])]
+    arms = [parse_arm(s) for s in (ctx.arm or ["base"])]
+    for a in arms:
+        if a["exe"]:
+            a["exe"] = os.path.abspath(a["exe"])
+        bad = arm_conflicts(a, not ctx.no_deterministic)
+        if bad:
+            raise SystemExit(f"arm {a['name']} brings back what the deterministic mode removes: {', '.join(bad)}")
+    return arms
 
 
 def prompts_of(ctx: argparse.Namespace) -> list[str]:
@@ -396,9 +529,9 @@ def warn_unpinned(ctx: argparse.Namespace) -> None:
 
 
 def run_arm_once(ctx, base, arm, tag, prompts, jsonl) -> tuple[list[dict], dict]:
-    eng = Engine(ctx, tag, make_cfg(ctx, base, arm))
-    rows = []
+    eng = Engine(ctx, tag, make_cfg(ctx, base, arm))      # a failed start stops itself
     try:
+        rows = []
         for i, p in enumerate(prompts):
             r = eng.ask(p, max_tokens=ctx.max_tokens)
             r.update(arm=arm["name"], tag=tag, prompt_i=i)
@@ -414,11 +547,14 @@ def run_arm_once(ctx, base, arm, tag, prompts, jsonl) -> tuple[list[dict], dict]
 def cmd_probe(ctx) -> int:
     base = load_base(ctx)
     arm = arms_of(ctx)[0]
+    vram = free_vram_mib()
     eng = Engine(ctx, "probe", make_cfg(ctx, base, arm))
     try:
         s = eng.startup()
     finally:
         eng.stop()
+    s["free_vram_mib"] = vram
+    (Path(ctx.workdir) / "probe.json").write_text(json.dumps(s), encoding="utf-8")
     print(json.dumps(s))
     print("pin them with: --cache-slots %s --prefill-chunk %s   (take a little less if the desktop's VRAM use varies)"
           % (s.get("expert_cache", "?"), s.get("prefill_chunk", "?")))
@@ -431,10 +567,12 @@ def cmd_parity(ctx) -> int:
     ref: list[str] | None = None
     ref_name = ""
     worst = 0
+    pins: list[dict] = []
     for arm in arms:
         runs = []
         for k in range(ctx.engines):
-            rows, _ = run_arm_once(ctx, base, arm, f"{arm['name']}_{k}", prompts, ctx.out)
+            rows, st = run_arm_once(ctx, base, arm, f"{arm['name']}_{k}", prompts, ctx.out)
+            pins.append(st)
             runs.append([r["hash"] for r in rows])
             print(f"  {arm['name']} engine {k}: {' '.join(h[:6] for h in runs[-1])}", flush=True)
         bad = self_consistency(runs)
@@ -443,13 +581,18 @@ def cmd_parity(ctx) -> int:
                   f"engines (prompts {bad}); nothing more is run. The nondeterminism is not pinned by these settings "
                   f"(see docs/DETAILS.md, Run-to-run determinism).", flush=True)
             return 2
-        print(f"{arm['name']}: self-consistent over {ctx.engines} engines ({len(prompts)}/{len(prompts)} prompts)", flush=True)
+        if ctx.engines < 2:
+            print(f"{arm['name']}: self-consistency NOT CHECKED (one engine; use --engines 2 or more)", flush=True)
+        else:
+            print(f"{arm['name']}: self-consistent over {ctx.engines} engines ({len(prompts)}/{len(prompts)} prompts)", flush=True)
+        if pin_mismatch(pins):
+            print("WARNING: the engines' arena registration lines differ (pinned bytes): " + str(pins), flush=True)
         if ref is None:
             ref, ref_name = runs[0], arm["name"]
             continue
         diff = cross_arm(ref, runs[0])
-        print(f"{arm['name']} vs {ref_name}: {len(prompts) - len(diff)}/{len(prompts)} prompts identical"
-              + (f"; differ: {diff}" if diff else " (bit-identical on these prompts)"), flush=True)
+        print(f"{arm['name']} vs {ref_name}: the same text over the same token count on {len(prompts) - len(diff)}/{len(prompts)} "
+              f"prompts" + (f"; differ: {diff}" if diff else ""), flush=True)
         worst = max(worst, 1 if diff else 0)
     return worst
 
@@ -457,31 +600,43 @@ def cmd_parity(ctx) -> int:
 def cmd_speed(ctx) -> int:
     base, arms, prompts = load_base(ctx), arms_of(ctx), prompts_of(ctx)
     warn_unpinned(ctx)
-    # repeats[arm][prompt] = [(hash, decode tok/s), ...]
+    if ctx.rounds % len(arms):
+        print(f"WARNING: --rounds {ctx.rounds} is not a multiple of the {len(arms)} arms: the arm order is not balanced", flush=True)
     reps: dict[str, dict[int, list]] = {a["name"]: {} for a in arms}
+    pins: list[dict] = []
     for rnd in range(ctx.rounds):
         order = arms[rnd % len(arms):] + arms[: rnd % len(arms)]     # the arm order rotates between rounds
         for arm in order:
-            rows, _ = run_arm_once(ctx, base, arm, f"{arm['name']}_r{rnd}", prompts, ctx.out)
+            rows, st = run_arm_once(ctx, base, arm, f"{arm['name']}_r{rnd}", prompts, ctx.out)
+            pins.append(st)
             for r in rows:
                 reps[arm["name"]].setdefault(r["prompt_i"], []).append((r["hash"], r.get("decode_tps")))
             tps = [r["decode_tps"] for r in rows if r.get("decode_tps")]
             print(f"  round {rnd} {arm['name']}: median {median(tps):.1f} tok/s over {len(tps)} prompts", flush=True)
+    if pin_mismatch(pins):
+        print("WARNING: the engines' arena registration lines differ (pinned bytes): " + str(pins), flush=True)
     merged = {n: {i: merge_hash(v) for i, v in d.items()} for n, d in reps.items()}
+    for a in arms:
+        allv = [median(m["tps"]) for m in merged[a["name"]].values() if m["tps"]]
+        print(f"{a['name']}: median {median(allv):.1f} tok/s over all {len(allv)} prompts (not paired)")
     b = arms[0]["name"]
-    print(f"\nbaseline {b}: median {median([median(m['tps']) for m in merged[b].values() if m['tps']]):.1f} tok/s (all prompts)")
     rc = 0
     for arm in arms[1:]:
         res = paired_speed(merged[b], merged[arm["name"]])
-        print(f"{arm['name']} vs {b}: ", end="")
+        print(f"\n{arm['name']} vs {b}: ", end="")
         if res["n"]:
             print(f"paired ratio median {res['median']:.3f}, prompts faster {res['faster']}/{res['n']}")
         else:
             print("no prompt with identical text: no ratio")
+        if res["n"] * 2 < len(prompts):
+            print(f"  WARNING: only {res['n']}/{len(prompts)} prompts are comparable: a ratio over a minority is not the arm's speed")
         if res["diverged"]:
-            print(f"  text diverged (excluded): prompts {res['diverged']} - the arms did different work there; "
-                  f"{len(prompts) - len(res['diverged'])}/{len(prompts)} comparable")
-            rc = 1
+            print(f"  text diverged (excluded): prompts {res['diverged']} - the arms did different work there. Excluding them "
+                  f"selects the prompts where the change did not alter the text, which can bias the ratio")
+            rc = max(rc, 1)
+        if res["mixed"]:
+            print(f"  arm not self-consistent (repeats differ, excluded): prompts {res['mixed']}")
+            rc = 2
         if res["nospeed"]:
             print(f"  no decode line (excluded): prompts {res['nospeed']}")
         for i, v in sorted(res["ratios"].items()):
@@ -513,16 +668,21 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--pcie-frac", default="", help="--pcie-frac for every engine (default: the config's)")
     ap.add_argument("--tail-skip", default="7", help="STRATA_ROUTE_TAIL_SKIP for every engine (7 is the CUDA default when it applies)")
     ap.add_argument("--no-deterministic", action="store_true", help="do not set STRATA_DETERMINISTIC and its flags")
-    ap.add_argument("--min-free-ram-gb", type=float, default=0.0, help="wait for this much MemAvailable before each start")
+    ap.add_argument("--min-free-ram-gb", type=float, default=50.0, help="refuse to start an engine below this MemAvailable (0: off)")
+    ap.add_argument("--min-free-vram-mib", type=int, default=0, help="refuse below this free VRAM (default 90%% of what probe saw)")
     ap.add_argument("--wait-port", type=float, default=120.0, help="seconds to wait for the port to be free")
     ap.add_argument("--wait-ram", type=float, default=120.0)
     ap.add_argument("--wait-start", type=float, default=600.0, help="seconds for the server to answer after start")
     ap.add_argument("--request-timeout", type=float, default=300.0)
     ctx = ap.parse_args(argv)
+    for k in ("install_dir", "workdir", "config", "exe", "out", "prompts_file"):
+        if getattr(ctx, k):
+            setattr(ctx, k, os.path.abspath(getattr(ctx, k)))     # the server runs with cwd = install dir
     if not ctx.install_dir or not (Path(ctx.install_dir) / "serve" / "server.py").is_file():
         ap.error("--install-dir (or STRATA_DIR) must hold serve/server.py")
     if not ctx.config:
         ap.error("--config (or STRATA_AB_CONFIG) is the base run config")
+    install_signal_handlers()
     return {"probe": cmd_probe, "parity": cmd_parity, "speed": cmd_speed}[ctx.command](ctx)
 
 

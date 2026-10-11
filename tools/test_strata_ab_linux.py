@@ -38,8 +38,8 @@ class Parse(unittest.TestCase):
     def test_startup(self):
         t = ("strata generate: expert cache 5120 slots, 21.40 GiB of VRAM; policy is\n"
              "strata serve: prompt chunk auto: 8192 tokens, a 384-slot ring\n")
-        self.assertEqual(ab.parse_startup(t), {"expert_cache": 5120, "prefill_chunk": 8192})
-        self.assertEqual(ab.parse_startup("nothing"), {})
+        self.assertEqual(ab.parse_startup(t), {"expert_cache": 5120, "prefill_chunk": 8192, "pin": []})
+        self.assertEqual(ab.parse_startup("nothing"), {"pin": []})
 
 
 class Pairing(unittest.TestCase):
@@ -51,6 +51,19 @@ class Pairing(unittest.TestCase):
         self.assertEqual(ab.answer_hash("a", 3), ab.answer_hash("a", 3))
         self.assertNotEqual(ab.answer_hash("a", 3), ab.answer_hash("a", 4))
         self.assertNotEqual(ab.answer_hash("a", 3), ab.answer_hash("b", 3))
+
+    def test_hash_covers_finish_and_reasoning_and_rejects_empty(self):
+        self.assertNotEqual(ab.answer_hash("a", 3, "stop"), ab.answer_hash("a", 3, "length"))
+        self.assertNotEqual(ab.answer_hash("a", 3, "stop", "r1"), ab.answer_hash("a", 3, "stop", "r2"))
+        with self.assertRaises(ValueError):
+            ab.answer_hash("", 0, "stop")
+        ab.answer_hash("", 5, "stop", "only reasoning")
+
+    def test_pin_mismatch(self):
+        a = ab.parse_startup("cudaHostRegister PORTABLE ok; 47.0 GiB\nother")
+        b = ab.parse_startup("cudaHostRegister PORTABLE ok; 30.0 GiB\n")
+        self.assertFalse(ab.pin_mismatch([a, dict(a)]))
+        self.assertTrue(ab.pin_mismatch([a, b]))
 
     def test_self_consistency(self):
         self.assertEqual(ab.self_consistency([["a", "b", "c"], ["a", "b", "c"], ["a", "b", "c"]]), [])
@@ -81,8 +94,11 @@ class Pairing(unittest.TestCase):
         mixed = ab.merge_hash([("h", 1.0), ("g", 2.0)])
         self.assertTrue(mixed["hash"].startswith("*mixed*"))
         r = ab.paired_speed({0: m}, {0: mixed})
-        self.assertEqual(r["diverged"], [0])
+        self.assertEqual(r["mixed"], [0])
+        self.assertEqual(r["diverged"], [])
         self.assertEqual(r["n"], 0)
+        r = ab.paired_speed({0: mixed}, {0: m})       # a mixed baseline is never paired either
+        self.assertEqual((r["mixed"], r["n"]), ([0], 0))
 
     def test_all_diverged(self):
         r = ab.paired_speed({0: dict(hash="a", tps=[1.0])}, {0: dict(hash="b", tps=[2.0])})
@@ -124,6 +140,31 @@ class Config(unittest.TestCase):
         self.assertEqual(cfg["env"]["A"], "1")
         self.assertEqual((cfg["port"], cfg["log"]), (18080, "/l.log"))
         self.assertEqual(self.BASE["exe"], "/old/strata")
+
+    def test_bundle_pins_the_prefill_cpu_share(self):
+        self.assertEqual(ab.det_bundle(1, 1, "", "7", True)["env"]["STRATA_PREFILL_CPU_SHARE"], "0")
+
+    def test_config_drops_server_features_and_forces_localhost(self):
+        base = dict(self.BASE, api_key="k", host="0.0.0.0", expert_profile_save="/x", slot_save_path="/s", idle_unload_s=5,
+                    lazy_load=True, parallel=4, replicas=2, before_load="rm -rf /", vram_elastic=True, vision="v")
+        base["args"] = ["--spec", "4", "--vram-elastic", "--expert-profile-save", "/p", "--kv-grow"]
+        cfg = ab.build_config(base, ab.parse_arm("a"), ab.det_bundle(0, 0, "", "7", True), None, "/l", 1)
+        for k in ab.STRIP_KEYS:
+            self.assertNotIn(k, cfg)
+        self.assertEqual(cfg["host"], "127.0.0.1")
+        self.assertEqual(cfg["vision"], "v")
+        self.assertEqual(cfg["args"][:2], ["--spec", "4"])
+        for f in ab.STRIP_FLAGS:
+            self.assertNotIn(f, cfg["args"])
+        self.assertIn("--kv-grow", cfg["args"])
+        self.assertNotIn("/p", cfg["args"])
+
+    def test_arm_conflicts(self):
+        self.assertEqual(ab.arm_conflicts(ab.parse_arm("ok;arg=--adapt-swaps 40;env=STRATA_X=1"), True), [])
+        bad = ab.arm_conflicts(ab.parse_arm("b;arg=--suffix-draft 3;arg=--prefill auto;env=STRATA_PREFILL_CPU_SHARE=auto;"
+                                            "env=STRATA_ADAPT_ASYNC_WAIT=0;env=STRATA_DETERMINISTIC=0"), True)
+        self.assertEqual(len(bad), 5)
+        self.assertEqual(ab.arm_conflicts(ab.parse_arm("b;arg=--suffix-draft 3"), False), [])
 
     def test_no_deterministic_bundle_is_empty_but_for_pins(self):
         det = ab.det_bundle(0, 0, "", "7", False)

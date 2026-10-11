@@ -2291,7 +2291,7 @@ int main(int argc, char** argv) {
         o.suffix_draft = 0;
         o.lookup_chain = 0;
         std::fprintf(stderr, "strata: STRATA_DETERMINISTIC=1: no lookup drafts (the draft policy reads round times), no PCIe probe or "
-                             "refinement, the asynchronous tier only where it is driven by the window count\n");
+                             "refinement, no CPU prefill share by default, the asynchronous tier only where it is driven by the window count\n");
         if (o.expert_cache < 0 || (o.expert_cache == 0 && !o.expert_profile.empty()))   // (0 with a profile means auto)
             std::fprintf(stderr, "strata: STRATA_DETERMINISTIC=1 WARNING: the expert cache is sized from the free VRAM at start "
                                  "(--expert-cache auto); give --expert-cache N for the same cache in every run\n");
@@ -2301,8 +2301,17 @@ int main(int argc, char** argv) {
         if (std::getenv("STRATA_ROUTE_TAIL_SKIP") == nullptr)
             std::fprintf(stderr, "strata: STRATA_DETERMINISTIC=1 WARNING: STRATA_ROUTE_TAIL_SKIP is unset, so its default follows the "
                                  "share of experts in the GPU cache; set it (7 or 0)\n");
-        if (o.pcie_frac < 0.0 && !o.layer_split.empty())
-            std::fprintf(stderr, "strata: STRATA_DETERMINISTIC=1 WARNING: a layer split probes each stage's link; give --pcie-frac\n");
+        if (!o.layer_split.empty())
+            std::fprintf(stderr, "strata: STRATA_DETERMINISTIC=1: on a layer split every stage takes the one pcie_frac (no per-stage "
+                                 "link probe, no PcieAuto)\n");
+        if (const char* cs = std::getenv("STRATA_PREFILL_CPU_SHARE"); cs != nullptr && std::strcmp(cs, "auto") == 0) {
+            std::fprintf(stderr, "strata: STRATA_DETERMINISTIC=1: STRATA_PREFILL_CPU_SHARE=auto splits a prompt chunk from timed means; "
+                                 "use 0 or a fraction\n");
+            return 2;
+        }
+        if (o.pipeline_windows > 0 || o.batch > 0)
+            std::fprintf(stderr, "strata: STRATA_DETERMINISTIC=1 WARNING: %s is not covered (window order or slot mixing follows timing)\n",
+                         o.batch > 0 ? "--batch" : "--pipeline-windows");
     }
     std::vector<int64_t> split_at;
     std::vector<int> split_devs;
@@ -3528,7 +3537,7 @@ int main(int argc, char** argv) {
         // its own PCIe share of the missed experts (the same rule as CUDA0's above: its link is probed).  A given
         // --pcie-frac is every stage's share and skips these probes (pcie_given); there is no per-stage setting yet.
         st.pcie_frac = o.pcie_frac;
-        if (!pcie_given && native_pack) {
+        if (!pcie_given && native_pack && !strata::core::deterministic_mode()) {
             std::string bursts;
             const double bw = probe_pcie_h2d_gbps(&bursts);
             if (bw > 0.0) st.pcie_frac = pcie_frac_for_gbps(bw, 0.55);
@@ -7063,7 +7072,8 @@ int main(int argc, char** argv) {
                                  "nothing to take, so it is not armed by default (STRATA_PREFILL_CPU_SHARE=auto forces it)\n",
                          (long long) xcache.slots(), (long long) (g.n_layers * g.n_expert));
         if (share_pool && stages.empty() && !multi_gpu && share_has_work && !share_default_ok()) share_has_work = false;   // H11
-        strata::prefill::Prefill::arm_cpu_share(share_pool, share_pool && stages.empty() && !multi_gpu && share_has_work);
+        strata::prefill::Prefill::arm_cpu_share(share_pool, share_pool && stages.empty() && !multi_gpu && share_has_work &&
+                                            !strata::core::deterministic_mode());   // STRATA_DETERMINISTIC=1: the measured share is timing
         void* borrow = nullptr;
         uint64_t borrow_bytes = 0;
         int32_t lend_first = -1;          // the first slot the prompt path may borrow (its largest chunk)
@@ -8728,7 +8738,7 @@ int main(int argc, char** argv) {
         };
         // arena only (the other modes keep their steps as they were): the choice on this thread (STRATA_ADAPT_PICK_INLINE),
         // the wait for the copies (STRATA_ADAPT_ASYNC_WAIT), the copies in flight per tick (STRATA_ADAPT_ASYNC_BATCH, 0 = all)
-        const bool a_inline = a_arena && a_env("STRATA_ADAPT_PICK_INLINE", 1) != 0;
+        const bool a_inline = a_arena && (strata::core::deterministic_mode() || a_env("STRATA_ADAPT_PICK_INLINE", 1) != 0);
         const bool a_wait = a_arena && (strata::core::deterministic_mode() || a_env("STRATA_ADAPT_ASYNC_WAIT", 1) != 0);
         const size_t a_batch = a_arena ? (size_t) std::max(0, a_env("STRATA_ADAPT_ASYNC_BATCH", 0)) : 0;
         // STRATA_ADAPT_ASYNC_DEMAND (arena only, default off): a round is sized by the demand - at most max(8, 4 x the CPU
@@ -12707,7 +12717,7 @@ int main(int argc, char** argv) {
     strata::prefill::Prefill::arm_cpu_share(!multi_gpu && !o.no_pool,
         !multi_gpu && !o.no_pool && o.batch <= 0 &&
         strata::prefill::share_rules::default_share_has_work((int64_t) xcache.slots(), (int64_t) (g.n_layers * g.n_expert)) &&
-        share_default_ok());   // H11   // before the chunk below sizes the loan
+        share_default_ok() && !strata::core::deterministic_mode());   // H11   // before the chunk below sizes the loan (STRATA_DETERMINISTIC=1: not by default, the measured share is timing)
     bool kvg_started = false;   // the elastic K/V took this run's cells
     double prefill_batched_ms = 0;
     std::FILE* final_r = o.dump_final_r.empty() ? nullptr : std::fopen(o.dump_final_r.c_str(), "wb");

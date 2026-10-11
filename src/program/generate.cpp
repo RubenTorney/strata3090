@@ -322,6 +322,21 @@ bool resident_stage_swaps(strata::core::FileExpertSource& src, const std::vector
     return true;
 }
 
+// STRATA_SPEC_CUM_P (0 = off): the default of --spec-cum-p, so the server's engine can be given it by environment
+// A value that is not above 0 (or is NaN) means off; one above 1 is taken as 1 and said so.
+static double spec_cum_p_value(double v, const char* what) {
+    if (!(v > 0.0)) return 0.0;
+    if (v > 1.0) {
+        std::fprintf(stderr, "strata generate: %s %g is above 1: using 1 (windows of one token)\n", what, v);
+        return 1.0;
+    }
+    return v;
+}
+static double spec_cum_p_env() {
+    const char* v = std::getenv("STRATA_SPEC_CUM_P");
+    return v != nullptr ? spec_cum_p_value(std::atof(v), "STRATA_SPEC_CUM_P") : 0.0;
+}
+
 struct Options {
     std::string pack = "pack/full";
     std::vector<int64_t> tokens;      // the prompt, PRE-TOKENIZED
@@ -590,6 +605,11 @@ struct Options {
     /// Plan v0.3 P6: a draft enters the verify window only while every draft before it (and itself) has at least
     /// this probability under the draft layer; 0 = always --spec-1 drafts.
     double spec_min_p = 0.0;
+    /// --spec-cum-p P (opt-in, also STRATA_SPEC_CUM_P; 0 = off): a draft enters the verify window only while the product
+    /// of the probabilities of every draft up to and including it is at least P (on top of --spec-min-p, if set): the
+    /// window's length follows how likely it is to be accepted whole, not each guess alone.  Use with a larger --spec
+    /// (its cap).  The solo generate and serve loops; --pipeline-windows and --batch slots keep the per-guess rule.
+    double spec_cum_p = spec_cum_p_env();
     /// Stop when the model emits an end-of-turn token (<|endoftext|> 248044, <|im_end|> 248046, or --eos-ids).
     bool stop_eos = false;
     std::vector<int64_t> eos_ids = {248044, 248046};
@@ -806,6 +826,10 @@ void usage() {
                  "                       writes 4; --suffix-draft lets it grow by 2, up to 8, where a repeat is likely)\n"
                  "  --spec-min-p P       how sure the draft layer must be to extend a verify window by another guess\n"
                  "                       (setup writes 0.5; --calibrate measures it on this PC, see docs/DETAILS.md)\n"
+                 "  --spec-cum-p P       opt-in (or STRATA_SPEC_CUM_P): extend a window only while the chance that all its\n"
+                 "                       guesses hold (the product of their probabilities) is at least P; raise --spec as\n"
+                 "                       its cap. Pipelined requests (--pipeline-windows) and --batch slots keep the per-guess\n"
+                 "                       rule. 0 = off\n"
                  "  --lookup-chain K     opt-in: after the MTP's drafts, add up to K prompt-lookup drafts that continue\n"
                  "                       them (the window grows to at most 8; default 0 = off)\n"
                  "  --lookup-chain-min M  the shortest context match --lookup-chain extends on (default 3)\n"
@@ -2000,6 +2024,7 @@ int main(int argc, char** argv) {
         else if (a == "--adapt-min-gain") o.adapt_min_gain = (float) std::atof(next("--adapt-min-gain"));
         else if (a == "--adapt-async") o.adapt_async = std::atoi(next("--adapt-async")) != 0 ? 1 : 0;
         else if (a == "--spec-min-p") o.spec_min_p = std::atof(next("--spec-min-p"));
+        else if (a == "--spec-cum-p") o.spec_cum_p = spec_cum_p_value(std::atof(next("--spec-cum-p")), "--spec-cum-p");
         else if (a == "--stop-eos") o.stop_eos = true;
         else if (a == "--spec-split") o.spec_split = true;
         else if (a == "--layer-split") o.layer_split = next("--layer-split");
@@ -3386,6 +3411,10 @@ int main(int argc, char** argv) {
             o.pipeline_windows = 0;
         }
     }
+    if (o.spec_cum_p > 0.0 && (o.pipeline_windows > 0 || o.batch > 0))
+        std::fprintf(stderr, "strata generate: --spec-cum-p %g: requests run pipelined (--pipeline-windows) and --batch "
+                             "slots keep the per-guess rule (--spec-min-p); requests on the serial loop apply it\n",
+                     o.spec_cum_p);
     // ---- layer split across GPUs: each later stage's own copy of the dense weights, its session and (the last) the
     // head, made on its device before the host arena is mapped (as the drafter below, for the same WDDM reason)
     std::vector<std::unique_ptr<GpuStage>> stages;
@@ -9194,7 +9223,7 @@ int main(int argc, char** argv) {
                         "mtp_max=%d lookup=%d vram_free_mib=%lld cvec=%s arena_mib=%lld pool_workers=%d pcie_frac=%.2f "
                         "spec_min_p=%.2f conversation_cache_mib=%lld conversation_cache_slots=%d "
                         "conversation_cache_min_free_mib=%lld conversation_cache_min_tokens=%lld "
-                        "tail_role_token=%lld vram_elastic=%d%s engine=" STRATA_VERSION "\n",
+                        "tail_role_token=%lld vram_elastic=%d%s%s engine=" STRATA_VERSION "\n",
                         (long long) o.max_context, o.kv.c_str(),
                         (long long) (g.n_qsa_layers() > 0 && ss.qsa_states[ss.qsa_primary()].kv_mode == 1
                                          ? ss.qsa_states[ss.qsa_primary()].n_slots * 4 : 0),
@@ -9209,7 +9238,8 @@ int main(int argc, char** argv) {
                         (long long) o.tail_role_token, xcache.segmented() ? 1 : 0,
                         o.batch > 0 ? (" batch_slots=" + std::to_string(o.batch) +
                                        " slot_cache=" + std::to_string(o.prompt_cache > 0 ? 1 : 0) +
-                                       " batch_groups=" + std::to_string(o.batch_groups)).c_str() : "");
+                                       " batch_groups=" + std::to_string(o.batch_groups)).c_str() : "",
+                        o.spec_cum_p > 0.0 ? (" spec_cum_p=" + std::to_string(o.spec_cum_p).substr(0, 6)).c_str() : "");
         }
         // issue #29: a request whose heartbeat (tokens, prompt chunks, verify windows) stops for this long is stuck on
         // a flag nobody will raise - end the engine with where it was, so the server starts it again instead of the
@@ -9271,6 +9301,7 @@ int main(int argc, char** argv) {
         int64_t rounds = 0;
         const int S = o.spec;
         const int S_mtp = o.mtp_max_t > 0 ? std::min(o.mtp_max_t, S) : S;   // the MTP's windows; suffixes go up to S
+        if (use_mtp) mtp.set_cum_p((float) o.spec_cum_p);
         if (use_mtp && S_mtp < S) mtp.set_max_drafts(S_mtp - 1);
         // --pipeline-windows 2 loads the drafter with 8 rows: the serial loop's chain keeps its own length
         else if (use_mtp && mtp.max_t() > S_mtp) mtp.set_max_drafts(S_mtp - 1);
@@ -11511,7 +11542,7 @@ int main(int argc, char** argv) {
                     if (req_spec_min_p > 0.0) {
                         T = 1;
                         while (T < S_mtp && from + T - 1 < avail && pr[from + T - 1] >= (float) req_spec_min_p) ++T;
-                    }
+                    }   // (--spec-cum-p is not applied on this pipelined path)
                     return std::max(1, std::min(T, 1 + avail - from));
                 };
                 // B from the chain's outputs: its row 0 is the guess at index `base`, its drafts follow
@@ -12029,10 +12060,8 @@ int main(int argc, char** argv) {
             }
             while (!pl_ran && !cancelled && produced_n < max_new) {
                 int T = use_mtp ? S_mtp : 1;   // no --mtp: one token a round unless a lookup draft fires
-                if (use_mtp && req_spec_min_p > 0.0) {
-                    T = 1;
-                    while (T < S_mtp && dprob[(size_t) T - 1] >= (float) req_spec_min_p) ++T;
-                }
+                if (use_mtp && (req_spec_min_p > 0.0 || o.spec_cum_p > 0.0))
+                    T = strata::spec::mtp_window_len(dprob.data(), S_mtp, req_spec_min_p, o.spec_cum_p);
                 if (first_window) T = 1;
                 // a repeat of earlier context (prompt lookup) where the MTP's own first guess agrees: the policy takes it
                 // when its expected tokens per ms, from the measured acceptance and window costs, beat the MTP window's
@@ -13202,6 +13231,7 @@ int main(int argc, char** argv) {
         // plan v0.3 P6: with a native pack the first window is the last prompt token alone (it produces the first
         // generated token and the MTP's first cell); otherwise the token loop already did that.
         bool first_window = native_pack;
+        if (use_mtp) mtp.set_cum_p((float) o.spec_cum_p);   // before the first draft round
         if (use_mtp && !first_window &&
             !mtp.draft_first(o.spec, ss.R, x, p - 1, drafts.data(), err, dprob.data(), (float) o.spec_min_p)) {
             std::fprintf(stderr, "strata generate: %s\n", err.c_str());
@@ -13241,10 +13271,8 @@ int main(int argc, char** argv) {
         while ((int64_t) produced.size() < max_new) {
             const Clock::time_point t0 = Clock::now();
             int T = S_mtp;
-            if (use_mtp && o.spec_min_p > 0.0) {
-                T = 1;
-                while (T < S_mtp && dprob[(size_t) T - 1] >= (float) o.spec_min_p) ++T;
-            }
+            if (use_mtp && (o.spec_min_p > 0.0 || o.spec_cum_p > 0.0))
+                T = strata::spec::mtp_window_len(dprob.data(), S_mtp, o.spec_min_p, o.spec_cum_p);
             if (first_window) T = 1;
             bool from_sfx = false;
             int sfx_match = 0;
@@ -13406,10 +13434,13 @@ int main(int argc, char** argv) {
         if (!follow.empty())
             std::printf("%-24s %lld of %lld emitted tokens differ from the argmax\n", "follow",
                         (long long) follow_differ, (long long) follow_emitted);
-        if (o.spec_min_p > 0.0) {
+        if (o.spec_min_p > 0.0 || o.spec_cum_p > 0.0) {
             std::printf("%-24s", "window sizes");
             for (size_t i = 1; i < window_hist.size(); ++i) std::printf(" T%zu:%lld", i, (long long) window_hist[i]);
-            std::printf("  (min draft probability %.2f)\n", o.spec_min_p);
+            if (o.spec_cum_p > 0.0)
+                std::printf("  (min draft probability %.2f, min chance the window holds %.2f)\n", o.spec_min_p, o.spec_cum_p);
+            else
+                std::printf("  (min draft probability %.2f)\n", o.spec_min_p);
         }
         if (o.suffix_draft > 0)
             std::printf("%-24s %lld windows, drafts accepted %lld of %lld\n", "suffix drafts", (long long) sfx_windows,

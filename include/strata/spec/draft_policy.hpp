@@ -19,6 +19,25 @@
 
 namespace strata::spec {
 
+/// The MTP window's size from the draft layer's own probabilities `dprob[0..]` (draft j's probability given the drafts
+/// before it), at most `max_t` tokens.  Draft j enters while its own probability is at least `min_p` (--spec-min-p)
+/// and, with `cum_p` > 0 (--spec-cum-p, opt-in), the product of the probabilities of drafts 0..j is at least `cum_p`:
+/// that product is the chance the whole window up to and including draft j is accepted, which is what one more row
+/// of the check is worth.  min_p = cum_p = 0: always `max_t`.
+inline int mtp_window_len(const float* dprob, int max_t, double min_p, double cum_p) {
+    // float throughout, in the negated form, as the drafter's own stop loop (MtpDrafter::draft): a NaN stops the window
+    const float mp = (float) min_p, cp = (float) cum_p;
+    int t = 1;
+    float cum = 1.0f;
+    while (t < max_t) {
+        const float q = dprob[t - 1];
+        cum *= q;
+        if ((min_p > 0.0 && !(q >= mp)) || (cum_p > 0.0 && !(cum >= cp))) break;
+        ++t;
+    }
+    return t;
+}
+
 class DraftPolicy {
 public:
     static constexpr int kMaxT = 8;

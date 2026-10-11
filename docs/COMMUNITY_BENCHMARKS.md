@@ -173,6 +173,37 @@ When comparing versions or settings, run both on the same machine and workload
 and list every changed setting. Preserve the per-run results: output text and
 draft acceptance can change speed even when the input is identical.
 
+## A paired A/B on one PC: same tokens in both arms
+
+At temperature 0.7 a prompt's text can differ between two runs of one build, and a different text is a different amount
+of work (acceptance, expert set): the same arm measured 121.2, 118.3 and 112.9 tok/s in three batches (RTX 3090, 12 cold
+prompts, median). `STRATA_DETERMINISTIC=1` fixes the decisions that come from the clock or a measurement (see
+[DETAILS.md](DETAILS.md), "Run-to-run determinism"), so greedy text is the same in every fresh engine, and speed can be
+compared on identical tokens. [`tools/strata_ab_linux.py`](../tools/strata_ab_linux.py) runs it (it starts engines: use
+it only when the GPU is free). It has not been run yet on the 3090 PC: the first run is the check that the pins hold.
+
+```bash
+export STRATA_DIR=~/strata STRATA_AB_CONFIG=~/strata/strata-iq3_s.json
+python tools/strata_ab_linux.py probe                       # prints the expert-cache slots and prompt chunk the engine picks
+# pin both (a little below the printed numbers if the desktop's VRAM use varies), then:
+python tools/strata_ab_linux.py parity --cache-slots N --prefill-chunk M --engines 3 \
+    --arm 'base;exe=/path/old/strata' --arm 'new;exe=/path/new/strata'
+python tools/strata_ab_linux.py speed  --cache-slots N --prefill-chunk M --rounds 2 \
+    --arm 'base;exe=/path/old/strata' --arm 'new;exe=/path/new/strata'
+```
+
+- `parity` first runs each arm in 3 fresh engines. If the answers of one arm differ between its own engines it says
+  `arm not self-consistent` and stops: nothing is pinned yet and "bit-identical" cannot be shown. Only then are the arms
+  compared with each other.
+- `speed` compares the decode tok/s of each prompt against the first arm. A prompt whose text differs between the arms is
+  marked `text diverged` and left out of the ratio (the arms did different work there). The result is the paired per-prompt
+  ratio, its median and the prompts-faster count. The server gives text, not token ids: the hash is of the text and the
+  completion token count.
+- Deterministic mode keeps the adaptive tier (it is driven by the window count in the arena mode) but drops lookup drafts
+  and the PCIe probe, so its absolute speed is not the default's: compare arms with each other only.
+- The script uses port 18080 (not a live server's 8080), waits for the port to be free (with a time limit) and stops only the
+  process group it started. Do not run it while another engine holds the GPU: the expert cache is sized from the free VRAM.
+
 ## Optional correctness checks
 
 Speed measurements alone do not establish answer quality. Include a small check

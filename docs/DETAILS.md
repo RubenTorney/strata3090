@@ -1805,6 +1805,41 @@ the document, +0.4% on the chat. Details: `bench/results/2026-09-27-esp/`.
 
 ---
 
+## Run-to-run determinism (`STRATA_DETERMINISTIC=1`, opt-in)
+
+Two fresh engines of one build with the same flags can give different greedy answers. The causes below were found by
+reading the decode path (not yet confirmed by a run on an engine: that is what `tools/strata_ab_linux.py parity` is for).
+"Numeric" changes the logits (an expert computed on the CPU, with ggml's single-token dot or Strata's multi-token kernels,
+and on the GPU round differently, so which path an expert takes, or how many tokens share it, changes the last bits);
+"timing" changes only speed.
+
+| Source | Where | Effect | Pinned by |
+|---|---|---|---|
+| Draft policy: lookup (suffix) windows and `--lookup-chain` are chosen from the measured round time per window size (EMA) | `src/spec/draft_policy.cpp` `observe`/`choose`/`chain`; used at `generate.cpp` (serve decode, `policy.choose`) | numeric (window shape: tokens per expert, CPU or GPU) | `STRATA_DETERMINISTIC=1` (sets `--suffix-draft 0 --lookup-chain 0`) |
+| The share of missed experts sent over PCIe is `(misses * pcie_num) >> 8`, in routing order | `src/core/expert_source.cpp` `expert_pool_dispatch_multi` | numeric; a function of the residency table, `pcie_num` and the window only, not of timing | fixed `pcie_num` (below) |
+| `pcie_num` from the start-up link probe, and from `PcieAuto` (measured CPU pool speed, three updates) when `--pcie-frac` is not given | `generate.cpp` (probe, `PcieAuto`) | numeric | `--pcie-frac X`, or `STRATA_DETERMINISTIC=1` (model's start value, no probe, no refinement) |
+| Expert-cache size `--expert-cache auto` (free VRAM at start; the desktop's use varies) and so the residency table | `generate.cpp` auto sizing | numeric (which experts are on the GPU) | `--expert-cache N` |
+| Default of `STRATA_ROUTE_TAIL_SKIP` depends on the share of experts in the cache (off above 90%) | `generate.cpp` | numeric | set `STRATA_ROUTE_TAIL_SKIP` (7 or 0) |
+| Prompt chunk `--prefill auto` (free VRAM) and the cache slots the prompt path lends | `generate.cpp` | numeric (chunk boundaries); the lent slots are refilled by the adaptive tier | `--prefill N` |
+| Asynchronous adaptive tier outside the arena mode: a round flips when its copies have landed | `generate.cpp` `adapt_tick` | numeric (the window that first computes a swapped-in expert on the GPU) | the arena mode (`STRATA_ADAPT_ASYNC_WAIT` waits for the copies: window-count driven); `STRATA_DETERMINISTIC=1` turns the async tier off elsewhere and ignores `STRATA_ADAPT_ASYNC_WAIT=0` and `STRATA_ADAPT_NOWAIT=1` |
+| Foresight swap space (`STRATA_FS_SLOTS`): a landed copy changes where an expert runs | `expert_source.cpp` `foresight_swap_from_env` | numeric | `STRATA_DETERMINISTIC=1` leaves it off |
+| Pages page-locked (`pinned()`: which missed experts can go over PCIe) with a partly pinned arena | `expert_source.cpp` `ArenaExpertSource::pinned` | numeric if the pinned prefix differs between starts | pin the whole arena, or `STRATA_ARENA_PIN_GIB` |
+| CPU pool: rows are split over the workers, each row is one worker's dot product | `src/kernels/cpu/pool.cpp` `run_phase`, `run_split_multi` | none by construction (not measured at two worker counts) | |
+| Pool spin/park, adaptive copy timing, `wait_flag_ge*` spins, `waitA/B/CPU` | `pool.cpp`, `verify.cpp` | timing only | |
+| GPU decode kernels: the only atomics are integer counters or a last-block reduction in a fixed order | `src/kernels/cuda` | none | |
+| Prefill: the order of tokens inside an expert's tile follows an atomic counter | `src/prefill/moe_fused.cu` `place_kernel` | none expected (int8 products per row; not measured) | |
+
+The adaptive tier itself (sync, or async in the arena mode) is driven by the window count (`--adapt-every`), the usage counts
+and `std::sort` over them, so it repeats if the routing repeats.
+
+`STRATA_DETERMINISTIC=1` pins: lookup drafts off, no link probe or `PcieAuto`, the async tier only where it is
+count-driven, no Foresight swap. The flags it cannot choose for you, and the engine warns when they are missing:
+`--expert-cache N`, `--prefill N`, `STRATA_ROUTE_TAIL_SKIP`, and `--pcie-frac X` on a layer split. Its answers differ from
+the default's (no lookup windows), and it is a little slower; use it to compare builds, not as a default.
+What remains: a different free-VRAM state at start if the three flags above are not given; a change of the CPU's thread
+count or of the driver or GPU; `--batch`, `--peer-device`, `--remote-expert-opt` and `--pipeline-windows` (not covered);
+a window cut by a request's `pcie_frac`/`spec_min_p` field.
+
 ## Troubleshooting
 
 | Symptom | What to do |

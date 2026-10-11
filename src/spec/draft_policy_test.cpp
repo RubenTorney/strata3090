@@ -114,6 +114,17 @@ int main() {
               "chain: stale full size is re-probed despite a profitable shorter chain");
         check(probes > 0 && confident, "chain: stale re-probes retain the MTP confidence gate");
     }
+    {   // mtp_window_len: the per-guess rule (--spec-min-p) against the cumulative one (--spec-cum-p)
+        const float pr[5] = {0.9f, 0.8f, 0.75f, 0.72f, 0.95f};
+        using strata::spec::mtp_window_len;
+        check(mtp_window_len(pr, 6, 0.0, 0.0) == 6, "window: no rule takes the cap");
+        check(mtp_window_len(pr, 6, 0.7, 0.0) == 6, "window: per-guess 0.7 keeps every guess here (each is >= 0.7)");
+        check(mtp_window_len(pr, 6, 0.7, 0.5) == 4, "window: cumulative 0.5 (0.9, 0.72, 0.54, 0.39) keeps 3 guesses");
+        check(mtp_window_len(pr, 6, 0.0, 0.3) == 6, "window: cumulative 0.3 keeps all five guesses");
+        check(mtp_window_len(pr, 3, 0.0, 0.1) == 3, "window: the cap holds");
+        const float zero[2] = {0.0f, 0.0f};
+        check(mtp_window_len(zero, 3, 0.0, 0.1) == 1, "window: guesses never drafted (probability 0) are left out");
+    }
     std::printf(g_fail ? "FAIL\n" : "PASS\n");
     return g_fail ? 1 : 0;
 }

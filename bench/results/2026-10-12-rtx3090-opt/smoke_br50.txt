@@ -1,0 +1,29 @@
+[smoke_br50] start (br50), free RAM 59.2 GB
+  start: [strata] 2026-10-11 22:02:01 engine started: /home/ruben/Documents/strata3090/build/strata --serve --pack /home/ruben/Documents/Strata-data/packs/iq3_s --native /home/ruben/Documents/Strata-data/models/IQ3_S/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_S-00001-of-00002.gguf --ple-gguf /home/ruben/Documents/Strata
+  start: strata generate: profile /home/ruben/Documents/strata/data/expert-profile.bin: 24576 ranked pairs, built for 24576 slots
+  start: strata generate: expert arena read through the file cache (buffered (not Windows))
+  start: strata generate: expert arena: cudaHostRegister PORTABLE ok; MAP_HUGETLB unavailable (needed 23983 2 MiB pages, vm.nr_hugepages=0); transparent huge pages requested (MADV_HUGEPAGE)
+  start: strata hc: CUDA0: the hyper-connection read runs as staged (the norm per token and stream, the down projection's activations staged ahead by cp.async); checked bit for bit against the plain read on this card (STRATA_HC_SPLIT=1 or 0 for the earlier ones)
+  start: strata serve: adaptive tier asynchronous (--adapt-async 1): up to 80 swaps per round, a round every 1 windows (arena: copy-in only)
+  start: strata verify: captured the 6-token window (upload no error, sync no error)
+  start: strata verify: captured the 2-token window (upload no error, sync no error)
+  start: strata verify: captured the 1-token window (upload no error, sync no error)
+  start: strata verify: captured the 4-token window (upload no error, sync no error)
+  start: strata verify: captured the 3-token window (upload no error, sync no error)
+  start: strata serve: asynchronous adaptive tier: 20 rounds, 1300 experts swapped in, 20.5 ms per round (start to flip, between windows) (arena, copy-in only, batch 0, wait 1, pick inline 0.10 ms/round, demand 0, 0 rounds skipped)
+  start: strata serve: asynchronous adaptive tier: 22 rounds, 1401 experts swapped in, 43.6 ms per round (start to flip, between windows) (arena, copy-in only, batch 0, wait 1, pick inline 0.11 ms/round, demand 0, 0 rounds skipped)
+  prompt 0: decode 106.2 tok/s, gen 135, drafts 67/84
+      strata decode timing: 71 windows, avg T 2.18, 1.90 tokens/window, 17.91 ms/window = verify 16.52 (GPU-reach wait 11.94 + per-layer host 3.67 [plan 0.07 actq 0.06 jobs 0.02 CPU 3.51] + stage 0.01) + commit/emit 0.01 + draft 1.11; per layer-window: CPU experts 0.90 (1.26 entries), VRAM hits 18.66, PCIe 0.51; adapt wait 0.27 join 0.00, 39.4 swaps/window
+      strata serve: decode expert cache hit rate: 93.7% (63587 hits / 67882 lookups); 2098 more read by the GPU over PCIe or from another GPU (3.0% of all 69980 routed)
+      strata serve: asynchronous adaptive tier: 93 rounds, 4277 experts swapped in, 29.4 ms per round (start to flip, between windows) (arena, copy-in only, batch 0, wait 1, pick inline 0.10 ms/round, demand 0, 0 rounds skipped)
+  prompt 1: decode 126.0 tok/s, gen 256, drafts 176/211
+      strata verify: captured the 5-token window (upload no error, sync no error)
+      strata decode timing: 82 windows, avg T 3.57, 3.12 tokens/window, 24.77 ms/window = verify 22.84 (GPU-reach wait 14.55 + per-layer host 7.30 [plan 0.13 actq 0.13 jobs 0.03 CPU 7.00] + stage 0.01) + commit/emit 0.01 + draft 1.58; per layer-window: CPU experts 1.72 (2.43 entries), VRAM hits 29.44, PCIe 1.27; adapt wait 0.34 join 0.00, 62.0 swaps/window
+      strata serve: decode expert cache hit rate: 92.4% (115888 hits / 125435 lookups); 5800 more read by the GPU over PCIe or from another GPU (4.4% of all 131235 routed)
+      strata serve: asynchronous adaptive tier: 175 rounds, 9397 experts swapped in, 30.2 ms per round (start to flip, between windows) (arena, copy-in only, batch 0, wait 1, pick inline 0.11 ms/round, demand 0, 0 rounds skipped)
+      strata serve: suffix drafts: 1 windows, 2 of 4 drafts accepted
+  prompt 4: decode 102.3 tok/s, gen 256, drafts 128/182
+      strata decode timing: 128 windows, avg T 2.42, 2.00 tokens/window, 19.56 ms/window = verify 18.09 (GPU-reach wait 12.60 + per-layer host 4.56 [plan 0.08 actq 0.07 jobs 0.02 CPU 4.37] + stage 0.01) + commit/emit 0.01 + draft 1.18; per layer-window: CPU experts 1.14 (1.44 entries), VRAM hits 20.51, PCIe 0.76; adapt wait 0.28 join 0.00, 40.0 swaps/window
+      strata serve: decode expert cache hit rate: 93.4% (126035 hits / 134893 lookups); 5305 more read by the GPU over PCIe or from another GPU (3.8% of all 140198 routed)
+      strata serve: asynchronous adaptive tier: 303 rounds, 14536 experts swapped in, 27.4 ms per round (start to flip, between windows) (arena, copy-in only, batch 0, wait 1, pick inline 0.11 ms/round, demand 0, 0 rounds skipped)
+      strata serve: suffix drafts: 1 windows, 0 of 3 drafts accepted

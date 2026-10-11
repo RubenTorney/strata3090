@@ -1,0 +1,40 @@
+[old_r2] start (old), free RAM 59.2 GB
+old            round 2: median 115.1 tok/s (min 103.1, max 129.3)
+[fb64_r2] start (fb64), free RAM 59.2 GB
+fb64           round 2: median 117.8 tok/s (min 104.1, max 130.4)
+[mg3_r2] start (mg3), free RAM 59.2 GB
+mg3            round 2: median 116.1 tok/s (min 100.8, max 131.9)
+[ab32_50_r2] start (ab32_50), free RAM 59.3 GB
+ab32_50        round 2: median 112.2 tok/s (min 95.9, max 120.2)
+[grv3_r2] start (grv3), free RAM 59.3 GB
+grv3           round 2: median 115.5 tok/s (min 103.5, max 133.5)
+[qfuse_r2] start (qfuse), free RAM 59.3 GB
+qfuse          round 2: median 95.4 tok/s (min 82.7, max 122.4)
+[vr300_r2] start (vr300), free RAM 59.2 GB
+Traceback (most recent call last):
+  File "/home/ruben/Documents/strata3090/bench/results/2026-10-12-rtx3090-opt/strata_ab2_linux.py", line 256, in <module>
+    srv = Server(f"{v}_r{sys.argv[3]}", v)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ruben/Documents/strata3090/bench/results/2026-10-12-rtx3090-opt/strata_ab2_linux.py", line 196, in __init__
+    self.ask([{"role": "user", "content": p}], seed=7 + i, max_tokens=48)
+  File "/home/ruben/Documents/strata3090/bench/results/2026-10-12-rtx3090-opt/strata_ab2_linux.py", line 207, in ask
+    with urllib.request.urlopen(r, timeout=900 if big else 150) as resp:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/urllib/request.py", line 215, in urlopen
+    return opener.open(url, data, timeout)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/urllib/request.py", line 521, in open
+    response = meth(req, response)
+               ^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/urllib/request.py", line 630, in http_response
+    response = self.parent.error(
+               ^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/urllib/request.py", line 559, in error
+    return self._call_chain(*args)
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/urllib/request.py", line 492, in _call_chain
+    result = func(*args)
+             ^^^^^^^^^^^
+  File "/usr/lib/python3.12/urllib/request.py", line 639, in http_error_default
+    raise HTTPError(req.full_url, code, msg, hdrs, fp)
+urllib.error.HTTPError: HTTP Error 400: Bad Request

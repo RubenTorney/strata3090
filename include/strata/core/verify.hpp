@@ -446,6 +446,13 @@ private:
     cudaStream_t df_side_[2] = {};
     cudaEvent_t df_fork_ = nullptr;
     cudaEvent_t df_join_[2] = {};
+    // STRATA_PCIE_BRANCH (strata3090, opt-in: =1): a layer's PCIe share - the flag B wait, the fetch of its
+    // blobs from the mapped arena and its grouped experts - runs on this side stream beside the VRAM hits instead of
+    // after them (post in record_window).  The two calls touch disjoint entries (the PCIe call's start after the VRAM
+    // call's) and disjoint rows of hit_out and the scratch, so the values are the same bits; only the order is freer.
+    bool pf_branch_ = false;
+    cudaStream_t pf_side_ = nullptr;
+    cudaEvent_t pf_fork_ = nullptr, pf_join_ = nullptr;
     cudaGraphExec_t exec_[9] = {};
     cudaGraphExec_t exec_nr_[9] = {};   // #871: the doorbell variant of a stage that is all-resident otherwise
     cudaGraphExec_t commit_exec_ = nullptr;

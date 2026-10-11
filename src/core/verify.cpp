@@ -511,6 +511,9 @@ Verifier::~Verifier() {
     if (df_fork_) cudaEventDestroy(df_fork_);
     for (cudaEvent_t e : df_join_)
         if (e) cudaEventDestroy(e);
+    if (pf_side_) cudaStreamDestroy(pf_side_);
+    if (pf_fork_) cudaEventDestroy(pf_fork_);
+    if (pf_join_) cudaEventDestroy(pf_join_);
     if (arena_) cudaFree(arena_);
     void* hosts[] = {h_tok_, h_step_, h_pos_, h_commit_, h_ple_, h_out_, h_x_, h_ids_, h_w_, h_seq_, h_flag_, h_ymiss_,
                      h_flagA_, h_plan_, h_flagB_, h_plan_err_, h_nf_};
@@ -754,6 +757,35 @@ bool Verifier::init(const WeightTable& wt, const ModelGeometry& g, SessionState&
                 okb = cudaStreamCreateWithFlags(&df_side_[i], cudaStreamNonBlocking) == cudaSuccess &&
                       cudaEventCreateWithFlags(&df_join_[i], cudaEventDisableTiming) == cudaSuccess;
             if (!okb) { cudaGetLastError(); df_branch_ = false; }
+        }
+    }
+    {   // STRATA_PCIE_BRANCH (strata3090): the PCIe share beside the VRAM hits (see verify.hpp).  Opt-in
+        // (STRATA_PCIE_BRANCH=1); unset keeps the serial order.  Not with STRATA_GROUPED_V1 / STRATA_EXPERT_V2 / STRATA_EXPERT_V2K, whose
+        // SwiGLU pass sweeps every entry of the buffer (the default pass covers the call's own entries only).  The same
+        // caveat as STRATA_DF_BRANCH: a graph with side branches stopped on Linux open modules when an NVML query came
+        // between requests (#905) - do not run nvidia-smi beside a serving engine with it on.
+        const char* v = std::getenv("STRATA_PCIE_BRANCH");
+        const bool sweeping = [] {
+            for (const char* n : {"STRATA_GROUPED_V1", "STRATA_EXPERT_V2", "STRATA_EXPERT_V2K"})
+                if (const char* e = std::getenv(n); e != nullptr && e[0] == '1') return true;
+            return false;
+        }();
+        pf_branch_ = v != nullptr && std::atoi(v) != 0 && !sweeping;
+        if (pf_branch_ && pf_side_ == nullptr) {
+            const bool okb = cudaStreamCreateWithFlags(&pf_side_, cudaStreamNonBlocking) == cudaSuccess &&
+                             cudaEventCreateWithFlags(&pf_fork_, cudaEventDisableTiming) == cudaSuccess &&
+                             cudaEventCreateWithFlags(&pf_join_, cudaEventDisableTiming) == cudaSuccess;
+            if (!okb) { cudaGetLastError(); pf_branch_ = false; }
+        }
+        static bool said = false;
+        if (!said && device_ == 0) {
+            said = true;
+            if (pf_branch_)
+                std::fprintf(stderr, "strata verify: the PCIe share's fetch and experts run beside the VRAM hits "
+                                     "(STRATA_PCIE_BRANCH=1)\n");
+            else if (v != nullptr && std::atoi(v) != 0)
+                std::fprintf(stderr, "strata verify: STRATA_PCIE_BRANCH is off: %s\n",
+                             sweeping ? "STRATA_GROUPED_V1 / STRATA_EXPERT_V2 sweep every entry" : "no side stream");
         }
     }
     // Check whether 100% of experts across [lb_, le_) are resident in this stage's VRAM cache.
@@ -1574,22 +1606,23 @@ bool Verifier::record_window(int T, cudaStream_t cs, std::string& err) {
         const auto& lay = strata::kernels::cpu::expert_layout();
         // plan v0.3 P6: the VRAM groups now; the PCIe groups once the copy engine has landed them in staging.
         // `gy`: the native launch's groups side by side (0: cap, one block row per possible group).
-        auto grouped = [&](const unsigned long long* gp, const int32_t* gs, const int32_t* gn, int64_t gy, float* dst_buf) {
+        auto grouped = [&](const unsigned long long* gp, const int32_t* gs, const int32_t* gn, int64_t gy, float* dst_buf,
+                           cudaStream_t gs_stream) {
             if (lay.native) {
                 // the layer's GGUF formats (i-quant gate/up, Q2_0 / IQ4_NL down)
                 const auto& f = lay.fmt[(size_t) l];
                 const NativeExpertLayout L = native_expert_layout(f.gu_type, f.d_type, f.n_embd, f.n_ff);
                 native_expert_grouped(L, gp, gs, gn, p_dst, p_tok, cap, cap,
-                                      nat_xq_ + (size_t) tb * (N / 32) * 36, hit_scratch_, dst_buf, cs, gy);
+                                      nat_xq_ + (size_t) tb * (N / 32) * 36, hit_scratch_, dst_buf, gs_stream, gy);
             } else {
                 moe_grouped_s2(gp, gs, gn, p_dst, p_tok, cap, cap, hit_xq_ + (size_t) tb * (N / 32) * 34,
-                               hit_xs_ + (size_t) tb * (N / 32), hit_scratch_, dst_buf, cs);
+                               hit_xs_ + (size_t) tb * (N / 32), hit_scratch_, dst_buf, gs_stream);
             }
         };
         bool hits_in_combine = false;
         if (ar_on()) {
             stamp(l, 19, grp);
-            grouped(p_ptr, p_start, p_counts, 0, parts_out);
+            grouped(p_ptr, p_start, p_counts, 0, parts_out, cs);
             stamp(l, 20, grp);
         } else {
             if (device_plan_) {   // E-6: skipped when the device planned this group (all its experts resident)
@@ -1604,20 +1637,34 @@ bool Verifier::record_window(int T, cudaStream_t cs, std::string& err) {
                 }
             }
             stamp(l, 19, grp);
-            grouped(p_ptr, p_start, p_counts, 0, hit_out);
+            // STRATA_PCIE_BRANCH (strata3090): the PCIe share's wait, fetch and experts on pf_side_ beside the VRAM hits
+            // (the plan copy above is their common input; the join below is before the CPU rows and the hit add).  Not
+            // under the stage profiler, whose stamps are on cs (then the serial order, as before).
+            const bool pfb = pf_branch_ && !prof_on_ && sink_.pcie_mode == 2;
+            cudaStream_t ps = cs;
+            if (pfb) {
+                cudaEventRecord(pf_fork_, cs);
+                cudaStreamWaitEvent(pf_side_, pf_fork_, 0);
+                ps = pf_side_;
+            }
+            grouped(p_ptr, p_start, p_counts, 0, hit_out, cs);
             stamp(l, 20, grp);
-            if (device_plan_) wait_flag_ge_or(m_flagB_, ring, skip_ + grp, cs);
-            else wait_flag_ge(m_flagB_, ring, cs);                 // the PCIe share is in staging (DMA) or mapped
+            if (device_plan_) wait_flag_ge_or(m_flagB_, ring, skip_ + grp, ps);
+            else wait_flag_ge(m_flagB_, ring, ps);                 // the PCIe share is in staging (DMA) or mapped
             if (sink_.pcie_mode == 2) {                            // stage it with a copy kernel, then point at staging
                 const int64_t per = G == 2 ? kStagingBlobs / 2 : kStagingBlobs;
                 uint8_t* stage = staging_ + (size_t) (grp * per) * lay.max_blob;
-                fetch_blobs(p_ptr2, p_counts + 2, stage, (int64_t) lay.blob_bytes(l), (int) per, cs);
-                rebase_ptrs((unsigned long long*) p_ptr2, p_counts + 2, stage, (int64_t) lay.blob_bytes(l), cs);
+                fetch_blobs(p_ptr2, p_counts + 2, stage, (int64_t) lay.blob_bytes(l), (int) per, ps);
+                rebase_ptrs((unsigned long long*) p_ptr2, p_counts + 2, stage, (int64_t) lay.blob_bytes(l), ps);
             }
             stamp(l, 21, grp);
             // the PCIe share is pcie_frac of the misses: a few groups when the cache is cold, usually none (always none at
             // pcie_frac 0), so its launch is kPcieGroupRows block rows striding over the groups, not cap of them
-            grouped(p_ptr2, p_start2, p_counts + 2, kPcieGroupRows, hit_out);
+            grouped(p_ptr2, p_start2, p_counts + 2, kPcieGroupRows, hit_out, ps);
+            if (pfb) {
+                cudaEventRecord(pf_join_, pf_side_);
+                cudaStreamWaitEvent(cs, pf_join_, 0);
+            }
             stamp(l, 22, grp);
             if (device_plan_) {   // no CPU share when the device planned the group: its rows are zeros
                 wait_flag_ge_or(m_flag_, ring, skip_ + grp, cs);

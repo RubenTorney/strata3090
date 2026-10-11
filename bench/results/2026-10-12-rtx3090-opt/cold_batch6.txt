@@ -1,0 +1,6 @@
+[old_r3] start (old), free RAM 59.2 GB
+old            round 3: median 118.0 tok/s (min 103.4, max 130.5)
+[oldgrv3_r3] start (oldgrv3), free RAM 59.2 GB
+oldgrv3        round 3: median 116.1 tok/s (min 98.7, max 131.4)
+[fb64grv3_r3] start (fb64grv3), free RAM 59.0 GB
+fb64grv3       round 3: median 119.3 tok/s (min 105.2, max 135.8)

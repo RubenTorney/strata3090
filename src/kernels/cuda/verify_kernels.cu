@@ -541,6 +541,31 @@ __global__ void fetch_blobs_kernel(const unsigned long long* __restrict__ src, c
     }
 }
 
+// strata3090: the same copy with fewer, wider blocks - four 16-byte loads per thread per step, issued before their
+// stores, so a block keeps enough PCIe requests in flight and the grid can be small.  Beside the VRAM hits
+// (STRATA_PCIE_BRANCH) the 384-block grid above took every SM slot the hits kernel wanted; the link needs only a few
+// hundred KB in flight (~24 GB/s x a few us), which 64 blocks of 256 threads x 64 B give.
+__global__ void fetch_blobs_wide_kernel(const unsigned long long* __restrict__ src, const int32_t* __restrict__ n,
+                                        uint4* __restrict__ dst, long long per) {
+    const long long total = (long long) *n * per;
+    const long long stride = (long long) gridDim.x * blockDim.x;
+    long long i = (long long) blockIdx.x * blockDim.x + threadIdx.x;
+    for (; i + 3 * stride < total; i += 4 * stride) {
+        uint4 v[4];
+#pragma unroll
+        for (int u = 0; u < 4; ++u) {
+            const long long j = i + u * stride, k = j / per;
+            v[u] = ((const uint4*) src[k])[j - k * per];
+        }
+#pragma unroll
+        for (int u = 0; u < 4; ++u) dst[i + u * stride] = v[u];
+    }
+    for (; i < total; i += stride) {
+        const long long k = i / per;
+        dst[i] = ((const uint4*) src[k])[i - k * per];
+    }
+}
+
 __global__ void rebase_ptrs_kernel(unsigned long long* ptr, const int32_t* n, unsigned long long base, long long bytes) {
     const int k = threadIdx.x;
     if (k < *n) ptr[k] = base + (unsigned long long) k * (unsigned long long) bytes;
@@ -632,7 +657,12 @@ __global__ void force_token_kernel(int32_t* tok, const int32_t* force, int j) {
 void fetch_blobs(const unsigned long long* src, const int32_t* n, uint8_t* dst, int64_t blob_bytes, int cap, void* stream) {
     if (cap <= 0) return;
     if (blob_bytes % 16 != 0) { std::fprintf(stderr, "fetch_blobs: blob size must be a multiple of 16\n"); std::exit(1); }
-    fetch_blobs_kernel<<<48 * 8, 256, 0, (cudaStream_t) stream>>>(src, n, (uint4*) dst, (long long) (blob_bytes / 16));
+    // STRATA_FETCH_BLOCKS=N (strata3090, opt-in, measured at 64): the wide kernel on N blocks; unset or 0 = the 384-block kernel as before
+    static const int blocks = [] { const char* v = std::getenv("STRATA_FETCH_BLOCKS"); return v != nullptr ? std::atoi(v) : 0; }();
+    if (blocks > 0)
+        fetch_blobs_wide_kernel<<<blocks, 256, 0, (cudaStream_t) stream>>>(src, n, (uint4*) dst, (long long) (blob_bytes / 16));
+    else
+        fetch_blobs_kernel<<<48 * 8, 256, 0, (cudaStream_t) stream>>>(src, n, (uint4*) dst, (long long) (blob_bytes / 16));
     check("fetch_blobs");
 }
 

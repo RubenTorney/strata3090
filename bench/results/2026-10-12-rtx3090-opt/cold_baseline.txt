@@ -1,0 +1,6 @@
+[async43_r1] start (async43), free RAM 58.7 GB
+async43        round 1: median 121.2 tok/s (min 101.6, max 131.4)
+   errors: ['strata verify: captured the 6-token window (upload no error, sync no error)', 'strata verify: captured the 2-token window (upload no error, sync no error)', 'strata verify: captured the 1-token window (upload no error, sync no error)']
+[b43_r1] start (b43), free RAM 59.3 GB
+b43            round 1: median 83.4 tok/s (min 69.5, max 95.9)
+   errors: ['strata verify: captured the 6-token window (upload no error, sync no error)', 'strata verify: captured the 2-token window (upload no error, sync no error)', 'strata verify: captured the 1-token window (upload no error, sync no error)']

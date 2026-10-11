@@ -1,0 +1,8 @@
+[old_r1] start (old), free RAM 59.0 GB
+old            round 1: median 117.6 tok/s (min 103.4, max 129.7)
+[fb64_r1] start (fb64), free RAM 59.2 GB
+fb64           round 1: median 118.7 tok/s (min 104.4, max 131.2)
+[fb64_50_r1] start (fb64_50), free RAM 59.2 GB
+fb64_50        round 1: median 113.3 tok/s (min 99.2, max 130.2)
+[fb16_r1] start (fb16), free RAM 59.3 GB
+fb16           round 1: median 114.9 tok/s (min 104.4, max 130.6)

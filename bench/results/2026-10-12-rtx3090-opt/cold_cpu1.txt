@@ -1,0 +1,8 @@
+[async43_r1] start (async43), free RAM 59.2 GB
+async43        round 1: median 112.9 tok/s (min 102.9, max 128.1)
+[mt1_r1] start (mt1), free RAM 59.2 GB
+mt1            round 1: median 114.9 tok/s (min 101.9, max 129.8)
+[gather_r1] start (gather), free RAM 59.3 GB
+gather         round 1: median 113.8 tok/s (min 101.6, max 126.7)
+[pw11_r1] start (pw11), free RAM 59.2 GB
+pw11           round 1: median 111.7 tok/s (min 96.6, max 127.6)

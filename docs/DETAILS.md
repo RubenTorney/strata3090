@@ -1782,6 +1782,35 @@ the pairs in which the switched arm won). They are here so you can try them on y
   decode median tok/s: Q2_0 16 GB 62.5 -> 66.2 (+5.9%), Q2_0 as a 12 GB card 51.3 -> 54.2 (+5.7%), IQ3_XXS 16 GB 48.6 -> 52.6 (+8.3%),
   IQ3_XXS as 12 GB 39.3 -> 41.5 (+5.5%), 6/6 pairs faster every time.
 
+## The hyper-connection read on an RTX 3090 (sm_86): `STRATA_GR_SM86`, `STRATA_GR_SM86_DOWN`, `STRATA_GR_ACT_AHEAD` (all off unless you set them)
+
+Each layer runs the hyper-connection read twice per window: a norm, the down projection (6.5 MB of BF16, 41 blocks) and the up
+projection (6.5 MB, 160 blocks). On an RTX 3090 (0.1.43, `STRATA_VERIFY_PROFILE=1`) the down and up kernels took about 0.6
+ms per window each side of a layer (`hc0 down`, `hc0 up`, `hc1 down`, `hc1 up`), about 400 GB/s of the card's 936. These
+switches are **not measured yet**; nothing here is a speed claim.
+
+- **`STRATA_GR_SM86=1`**: the down kernel `gr_down_s86_kernel` (a lane requests all 40 of its 16-byte loads of the weight row
+  at the start instead of one 5-load tile ahead; 80 + 1 blocks of 128 threads; the tiles then run from registers), the
+  register norm (`gr_norm_split_fast_kernel`, gfx12-only before) and the latency-hidden up (`gr_up_fast_kernel`).
+- **`STRATA_GR_SM86_DOWN=1`**: the down kernel alone, for an A/B that attributes. `STRATA_GR_FAST=1` already switches the up
+  kernel on by itself on CUDA (an explicit `STRATA_GR_FAST=0` keeps it off under `STRATA_GR_SM86` too), so it has no switch here.
+- **`STRATA_GR_ACT_AHEAD=1`** (implies the down kernel): the activation tiles run 2 to 8 deep instead of 1, one barrier a tile
+  (`gr_down_s86a_kernel`; the whole window of 1-2 tokens is staged at once, 4 buffers up to 4 tokens, 3 up to 6, 2 above).
+
+Only on an sm_86 card with 64 or more SMs. Every sum is computed in the default read's order, so the answers are bit for bit
+the default's by construction, and at start-up `fused_gr_check` runs each opt-in as its own set against the default kernels for
+1-8 tokens, with and without the pending write; a difference prints a line naming the switch and leaves the default kernels.
+With `STRATA_HC_SPLIT=0`, or when the staged read is not the one in use, the switches do nothing and the log says so. The start-up
+log says which kernels are active; `STRATA_GR_128=1` takes the down read away from `STRATA_GR_SM86` (the log says that too).
+
+Expectation (from reading the code, not measured): at most about 0.2 ms of a 26 ms window from the down kernel alone. Judge it by
+the per-kernel stamps (`hc0 down`, `hc1 down` under `STRATA_VERIFY_PROFILE=1`), not by tok/s, which moves by +-4% from run to run.
+
+Next steps that were left out because they change the order of the sums or are larger: fusing the norm into the down kernel
+(each block would redo the norm), and a K-split down kernel (the slices are added in another order). `STRATA_DUMMY_NODES=k` adds
+k empty graph nodes per layer and prices what one kernel boundary costs in a window (a reviewer estimated 0.3-0.5 ms per window
+for the gaps between the hyper-connection kernels; unmeasured).
+
 ## Thread placement: `--aux-cpus` (Linux, off by default)
 
 The CPU pool pins its workers (one logical CPU per physical core) and the host thread pins itself to the pool's reserved

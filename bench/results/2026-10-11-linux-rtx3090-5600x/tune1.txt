@@ -1,0 +1,2 @@
+[main_rhp] start (main), free RAM 12.1 GB
+main           round hp: median 93.9 tok/s (min 77.6, max 104.8)

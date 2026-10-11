@@ -1,0 +1,17 @@
+[main_rt2] start (main), free RAM 58.8 GB
+main           round t2: median 94.5 tok/s (min 81.3, max 113.0)
+   errors: ['strata verify: captured the 6-token window (upload no error, sync no error)', 'strata verify: captured the 2-token window (upload no error, sync no error)', 'strata verify: captured the 1-token window (upload no error, sync no error)']
+[main_kg_rt2] start (main_kg), free RAM 58.9 GB
+main_kg        round t2: median 100.0 tok/s (min 86.1, max 116.8)
+   errors: ['strata verify: captured the 6-token window (upload no error, sync no error)', 'strata verify: captured the 2-token window (upload no error, sync no error)', 'strata verify: captured the 1-token window (upload no error, sync no error)']
+[main_async_rt2] start (main_async), free RAM 58.7 GB
+main_async     round t2: median 92.8 tok/s (min 78.8, max 106.1)
+   errors: ['strata verify: captured the 6-token window (upload no error, sync no error)', 'strata verify: captured the 2-token window (upload no error, sync no error)', 'strata verify: captured the 1-token window (upload no error, sync no error)']
+[main_kg_async_rt2] start (main_kg_async), free RAM 58.8 GB
+main_kg_async  round t2: median 99.2 tok/s (min 88.5, max 109.6)
+   errors: ['strata verify: captured the 6-token window (upload no error, sync no error)', 'strata verify: captured the 2-token window (upload no error, sync no error)', 'strata verify: captured the 1-token window (upload no error, sync no error)']
+exit 0
+main           median   94.5 tok/s (n=12), vs main: ratio median 1.000, prompts faster 0/12
+main_async     median   92.8 tok/s (n=12), vs main: ratio median 0.971, prompts faster 1/12
+main_kg        median  100.0 tok/s (n=12), vs main: ratio median 1.056, prompts faster 11/12
+main_kg_async  median   99.2 tok/s (n=12), vs main: ratio median 1.042, prompts faster 10/12

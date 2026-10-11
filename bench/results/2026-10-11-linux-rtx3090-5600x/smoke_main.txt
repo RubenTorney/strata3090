@@ -1,0 +1,22 @@
+[smoke_main] start (main), free RAM 57.4 GB
+  start: strata generate: profile /home/ruben/Documents/strata/data/expert-profile.bin: 24576 ranked pairs, built for 24576 slots
+  start: strata generate: expert arena read through the file cache (buffered (not Windows))
+  start: strata generate: expert arena: cudaHostRegister PORTABLE ok; MAP_HUGETLB unavailable (needed 23983 2 MiB pages, vm.nr_hugepages=0); transparent huge pages requested (MADV_HUGEPAGE)
+  start: strata hc: CUDA0: the hyper-connection read runs as staged (the norm per token and stream, the down projection's activations staged ahead by cp.async); checked bit for bit against the plain read on this card (STRATA_HC_SPLIT=1 or 0 for the earlier ones)
+  start: strata verify: captured the 6-token window (upload no error, sync no error)
+  start: strata verify: captured the 2-token window (upload no error, sync no error)
+  start: strata verify: captured the 1-token window (upload no error, sync no error)
+  start: strata verify: captured the 4-token window (upload no error, sync no error)
+  start: strata verify: captured the 3-token window (upload no error, sync no error)
+  prompt 0: decode 81.0 tok/s, gen 151, drafts 75/136
+      strata decode timing: 77 windows, avg T 2.77, 1.96 tokens/window, 24.20 ms/window = verify 21.05 (GPU-reach wait 11.52 + per-layer host 8.63 [plan 0.11 actq 0.10 jobs 0.03 CPU 8.37] + stage 0.01) + commit/emit 0.02 + draft 1.35; per layer-window: CPU experts 2.18 (3.24 entries), VRAM hits 20.40, PCIe 1.18
+      strata serve: decode expert cache hit rate: 86.3% (75416 hits / 87396 lookups); 5425 more read by the GPU over PCIe or from another GPU (5.8% of all 92821 routed)
+  prompt 1: decode 93.9 tok/s, gen 256, drafts 181/218
+      strata verify: captured the 5-token window (upload no error, sync no error)
+      strata decode timing: 77 windows, avg T 3.83, 3.32 tokens/window, 35.42 ms/window = verify 32.03 (GPU-reach wait 11.80 + per-layer host 19.34 [plan 0.16 actq 0.15 jobs 0.05 CPU 18.95] + stage 0.01) + commit/emit 0.03 + draft 1.67; per layer-window: CPU experts 4.94 (7.54 entries), VRAM hits 23.86, PCIe 2.22
+      strata serve: decode expert cache hit rate: 76.0% (88181 hits / 116053 lookups); 9510 more read by the GPU over PCIe or from another GPU (7.6% of all 125563 routed)
+      strata serve: suffix drafts: 1 windows, 2 of 3 drafts accepted
+  prompt 4: decode 91.2 tok/s, gen 256, drafts 148/246
+      strata decode timing: 109 windows, avg T 3.26, 2.35 tokens/window, 25.76 ms/window = verify 22.50 (GPU-reach wait 11.57 + per-layer host 10.04 [plan 0.13 actq 0.11 jobs 0.03 CPU 9.73] + stage 0.02) + commit/emit 0.02 + draft 1.49; per layer-window: CPU experts 2.66 (3.74 entries), VRAM hits 25.39, PCIe 0.87
+      strata serve: decode expert cache hit rate: 87.2% (132823 hits / 152391 lookups); 5246 more read by the GPU over PCIe or from another GPU (3.3% of all 157637 routed)
+exit 0

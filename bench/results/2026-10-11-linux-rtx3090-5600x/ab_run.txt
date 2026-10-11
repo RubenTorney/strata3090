@@ -1,0 +1,18 @@
+smoke exit 0
+[main_r1] start (main), free RAM 58.9 GB
+main           round 1: median 94.5 tok/s (min 81.3, max 114.3)
+   errors: ['strata verify: captured the 6-token window (upload no error, sync no error)', 'strata verify: captured the 2-token window (upload no error, sync no error)', 'strata verify: captured the 1-token window (upload no error, sync no error)']
+[loc_r1] start (loc), free RAM 59.0 GB
+loc            round 1: median 94.3 tok/s (min 81.2, max 107.6)
+   errors: ['strata verify: captured the 6-token window (upload no error, sync no error)', 'strata verify: captured the 2-token window (upload no error, sync no error)', 'strata verify: captured the 1-token window (upload no error, sync no error)']
+[async_r1] start (async), free RAM 58.9 GB
+async          round 1: median 100.6 tok/s (min 86.7, max 108.4)
+   errors: ['strata verify: captured the 6-token window (upload no error, sync no error)', 'strata verify: captured the 2-token window (upload no error, sync no error)', 'strata verify: captured the 1-token window (upload no error, sync no error)']
+[stack2_r1] start (stack2), free RAM 58.9 GB
+stack2         round 1: median 102.4 tok/s (min 88.4, max 110.0)
+   errors: ['strata verify: captured the 6-token window (upload no error, sync no error)', 'strata verify: captured the 2-token window (upload no error, sync no error)', 'strata verify: captured the 1-token window (upload no error, sync no error)']
+r1 exit 0
+[stack2_r2] start (stack2), free RAM 58.9 GB
+stack2         round 2: median 102.4 tok/s (min 88.4, max 110.0)
+   errors: ['strata verify: captured the 6-token window (upload no error, sync no error)', 'strata verify: captured the 2-token window (upload no error, sync no error)', 'strata verify: captured the 1-token window (upload no error, sync no error)']
+[async_r2] start (async), free RAM 58.9 GB

@@ -62,6 +62,9 @@ const char* isa_floor_build();
 /// STRATA_IQ256_GATHER, the AVX-2 i-quant kernels' gathered grid decode (iq_avx2.cpp): -1 unset (auto, see
 /// cpu_gather_fast_here), 0 the scalar decode on every core, 1 the gathered one on every core.
 int iq256_gather_setting();
+/// STRATA_IQ_ZEN3 (opt-in, iq_avx2.cpp kIq256Zen3): 1 when set to a non-zero value.  Also moves a lone token's IQ3_S /
+/// IQ2_S gate/up rows onto the multi-token kernel (native_gu_mt_min).
+int iq256_zen3_setting();
 /// Whether this CPU's performance cores gather the IQ grid entries faster than they assemble them from scalar loads:
 /// an Intel CPU with AVX-VNNI, i.e. Alder Lake / Sapphire Rapids or newer, and not one of the E-core-only parts.
 /// The older Intel cores gather slowly (Haswell, Broadwell) or under the Downfall (GDS) microcode (Skylake to Tiger

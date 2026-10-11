@@ -128,6 +128,14 @@ int native_gu_mt_min(int gu_type) {
     // Opt-in (STRATA_IQ3S_MT1=1): it changes a lone token's IQ3_S rounding on those CPUs, so the default stays 0.1.39's.
     static const bool iq3s_one = env == nullptr && std::getenv("STRATA_IQ3S_MT1") != nullptr && cpu_avx2_ok() && std::getenv("STRATA_NO_IQ256") == nullptr &&
                                  !cpu_avx512_ok() && iq256_gather_setting() != 0 && cpu_gather_fast();
+    // STRATA_IQ_ZEN3=1 (opt-in, iq_avx2.cpp): the Zen 3 kernels for IQ3_S and IQ2_S take every group, a lone token
+    // included, on a CPU without AVX-512 - in decode most CPU experts serve one token.  (IQ3_XXS measured no faster than ggml's dot at one token, so it keeps the default rule.)  Only these gate/up rows move: the
+    // down rows keep their own rule in native_down_rows.  A lone token's rounding then differs from the default's
+    // (ggml's vec_dot against the multi-token kernel, #152), so with STRATA_IQ_ZEN3=1 the output is NOT bit-identical to
+    // the default path; each kernel stays bit-exact against its scalar reference (iq_avx2_parity).
+    static const bool zen3_one = env == nullptr && iq256_zen3_setting() != 0 && cpu_avx2_ok() && !cpu_avx512_ok() &&
+                                 std::getenv("STRATA_NO_IQ256") == nullptr;
+    if (zen3_one && (gu_type == 21 || gu_type == 22)) return 1;
     return iq3s_one && gu_type == 21 ? 1 : mt_min;
 }
 

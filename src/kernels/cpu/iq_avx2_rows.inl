@@ -151,6 +151,55 @@ inline void row_dot_any(const uint8_t* row, int nblocks, const block_q8_K* const
     else                    row_dot<TY, NT>(row, nblocks, y, res);
 }
 
+// STRATA_IQ_ZEN3: gate row and up row in one pass over the blocks, the activation block shared.  Per 32-value half it
+// decodes row A and applies it to every token, then row B (the activations are read again from L1), so only one row's
+// grid / sign / scale vectors are live at a time (at two tokens of IQ3_S it measured slower than two row_dot calls, 0.40
+// against 0.37 ms per expert on a 5600X, and at one token the plain kernel was faster still, so only IQ2_S uses
+// this pass).  Each row keeps its own int32 and float accumulators, added in the
+// same order as row_dot, so the results are bit for bit row_dot's.
+template <int TY, int NT> STRATA_ROWS_FN
+inline void row_dot2(const uint8_t* rowA, const uint8_t* rowB, int nblocks, const block_q8_K* const* y, float* resA,
+                     float* resB) {
+    const int pf = prefetch_distance();
+    __m256 fa[NT], fb[NT];
+    for (int t = 0; t < NT; ++t) fa[t] = fb[t] = _mm256_setzero_ps();
+    for (int i = 0; i < nblocks; ++i) {
+        const uint8_t* ba = rowA + (size_t) i * Fmt32<TY>::bytes;
+        const uint8_t* bb = rowB + (size_t) i * Fmt32<TY>::bytes;
+        rows_ahead(ba, pf);
+        rows_ahead(bb, pf);
+        __m256i ia[NT], ib[NT];
+        for (int t = 0; t < NT; ++t) ia[t] = ib[t] = _mm256_setzero_si256();
+        for (int j = 0; j < 4; ++j) {
+            for (int half = 0; half < 2; ++half) {
+                const int off = 64 * j + 32 * half;
+                {
+                    __m256i g, sgn, sc;
+                    Fmt32<TY>::decode(ba, j, half, g, sgn, sc);
+                    for (int t = 0; t < NT; ++t) {
+                        const __m256i yv = _mm256_loadu_si256((const __m256i*) (y[t][i].qs + off));
+                        ia[t] = madd_add(ia[t], _mm256_maddubs_epi16(g, _mm256_sign_epi8(yv, sgn)), sc);
+                    }
+                }
+                {
+                    __m256i g, sgn, sc;
+                    Fmt32<TY>::decode(bb, j, half, g, sgn, sc);
+                    for (int t = 0; t < NT; ++t) {
+                        const __m256i yv = _mm256_loadu_si256((const __m256i*) (y[t][i].qs + off));
+                        ib[t] = madd_add(ib[t], _mm256_maddubs_epi16(g, _mm256_sign_epi8(yv, sgn)), sc);
+                    }
+                }
+            }
+        }
+        const float dxa = h2f(u16(ba)) * Fmt32<TY>::K, dxb = h2f(u16(bb)) * Fmt32<TY>::K;
+        for (int t = 0; t < NT; ++t) {
+            fa[t] = _mm256_fmadd_ps(_mm256_set1_ps(dxa * y[t][i].d), _mm256_cvtepi32_ps(ia[t]), fa[t]);
+            fb[t] = _mm256_fmadd_ps(_mm256_set1_ps(dxb * y[t][i].d), _mm256_cvtepi32_ps(ib[t]), fb[t]);
+        }
+    }
+    for (int t = 0; t < NT; ++t) { resA[t] = hsum8(fa[t]); resB[t] = hsum8(fb[t]); }
+}
+
 template <int TY, int NT> STRATA_ROWS_FN
 void gu_rows(const uint8_t* blob, size_t gu_row, size_t up_off, int n, const void* const* act, float* const* ff,
              int r0, int r1) {
@@ -159,8 +208,12 @@ void gu_rows(const uint8_t* blob, size_t gu_row, size_t up_off, int n, const voi
     const int nb = n / QK_K;
     float g[NT], u[NT];
     for (int r = r0; r < r1; ++r) {
-        row_dot_any<TY, NT>(blob + (size_t) r * gu_row, nb, y, g);
-        row_dot_any<TY, NT>(blob + up_off + (size_t) r * gu_row, nb, y, u);
+        if constexpr (TY == 322 && NT <= 2) {   // IQ2_S only: IQ3_S measured faster as two row_dot calls (see row_dot2)
+            row_dot2<TY, NT>(blob + (size_t) r * gu_row, blob + up_off + (size_t) r * gu_row, nb, y, g, u);
+        } else {
+            row_dot_any<TY, NT>(blob + (size_t) r * gu_row, nb, y, g);
+            row_dot_any<TY, NT>(blob + up_off + (size_t) r * gu_row, nb, y, u);
+        }
         for (int t = 0; t < NT; ++t) ff[t][r] = (g[t] / (1.f + std::exp(-g[t]))) * u[t];
     }
 }
@@ -206,33 +259,50 @@ void dot_rows_nt(int nt, const uint8_t* w, size_t row_bytes, int n, const void* 
     }
 }
 
-// The decode of each format for a variant: the gathered one (kIq256Gather) for IQ3_XXS, IQ3_S and IQ2_S.
-template <bool G> STRATA_ROWS_FN
+// The decode of each format for a variant (G 0 plain, 1 kIq256Gather, 2 kIq256Zen3; Zen 3 takes IQ3_S's plain decode at one token, where that measured faster) for IQ3_XXS, IQ3_S and IQ2_S.
+template <int G> STRATA_ROWS_FN
 void gu_type(int type, int nt, const uint8_t* blob, size_t gu_row, size_t up_off, int n, const void* const* act,
              float* const* ff, int r0, int r1) {
     switch (type) {
         case 16: gu_rows_nt<16>(nt, blob, gu_row, up_off, n, act, ff, r0, r1); break;
         case 17: gu_rows_nt<17>(nt, blob, gu_row, up_off, n, act, ff, r0, r1); break;
-        case 18: gu_rows_nt<G ? 118 : 18>(nt, blob, gu_row, up_off, n, act, ff, r0, r1); break;
-        case 21: gu_rows_nt<G ? 121 : 21>(nt, blob, gu_row, up_off, n, act, ff, r0, r1); break;
-        case 22: gu_rows_nt<G ? 122 : 22>(nt, blob, gu_row, up_off, n, act, ff, r0, r1); break;
+        case 18: gu_rows_nt<G == 2 ? 18 : G ? 118 : 18>(nt, blob, gu_row, up_off, n, act, ff, r0, r1); break;
+        case 21:
+            if (G == 2 && nt == 1) gu_rows_nt<21>(nt, blob, gu_row, up_off, n, act, ff, r0, r1);   // measured faster at one token
+            else gu_rows_nt<G == 2 ? 321 : G ? 121 : 21>(nt, blob, gu_row, up_off, n, act, ff, r0, r1);
+            break;
+        case 22: gu_rows_nt<G == 2 ? 322 : G ? 122 : 22>(nt, blob, gu_row, up_off, n, act, ff, r0, r1); break;
         case 23: gu_rows_nt<23>(nt, blob, gu_row, up_off, n, act, ff, r0, r1); break;
         default: break;
     }
 }
 
-template <bool G> STRATA_ROWS_FN
+template <int G> STRATA_ROWS_FN
 void dot_type(int type, int nt, const uint8_t* w, size_t row_bytes, int n, const void* const* act, float* const* out,
               int r0, int r1) {
     switch (type) {
         case 16: dot_rows_nt<16>(nt, w, row_bytes, n, act, out, r0, r1); break;
         case 17: dot_rows_nt<17>(nt, w, row_bytes, n, act, out, r0, r1); break;
-        case 18: dot_rows_nt<G ? 118 : 18>(nt, w, row_bytes, n, act, out, r0, r1); break;
-        case 21: dot_rows_nt<G ? 121 : 21>(nt, w, row_bytes, n, act, out, r0, r1); break;
-        case 22: dot_rows_nt<G ? 122 : 22>(nt, w, row_bytes, n, act, out, r0, r1); break;
+        case 18: dot_rows_nt<G == 2 ? 18 : G ? 118 : 18>(nt, w, row_bytes, n, act, out, r0, r1); break;
+        case 21:
+            if (G == 2 && nt == 1) dot_rows_nt<21>(nt, w, row_bytes, n, act, out, r0, r1);
+            else dot_rows_nt<G == 2 ? 321 : G ? 121 : 21>(nt, w, row_bytes, n, act, out, r0, r1);
+            break;
+        case 22: dot_rows_nt<G == 2 ? 322 : G ? 122 : 22>(nt, w, row_bytes, n, act, out, r0, r1); break;
         case 23: dot_rows_nt<23>(nt, w, row_bytes, n, act, out, r0, r1); break;
         default: break;
     }
+}
+
+// The Zen 3 variant's entries (STRATA_IQ_ZEN3): not inlined, so the other variants' dispatchers are the same code
+// with the switch unset.
+STRATA_ROWS_FN STRATA_NOINLINE void gu_zen3(int type, int nt, const uint8_t* blob, size_t gu_row, size_t up_off, int n,
+                                            const void* const* act, float* const* ff, int r0, int r1) {
+    gu_type<2>(type, nt, blob, gu_row, up_off, n, act, ff, r0, r1);
+}
+STRATA_ROWS_FN STRATA_NOINLINE void dot_zen3(int type, int nt, const uint8_t* w, size_t row_bytes, int n,
+                                             const void* const* act, float* const* out, int r0, int r1) {
+    dot_type<2>(type, nt, w, row_bytes, n, act, out, r0, r1);
 }
 
 // ---- IQ4_NL (type 20): 32-value blocks of 18 bytes (f16 d + 16 nibble bytes) against Q8_0 activations.

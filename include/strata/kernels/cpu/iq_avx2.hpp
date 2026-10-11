@@ -23,6 +23,9 @@ void iq256_rows(int ggml_type, const uint8_t* w, size_t row_bytes, int n, const 
 /// kIq256Vnni: AVX-VNNI's vpdpwssd / vpdpbusd, every format and iq4nl256_down_rows (cpu_avxvnni_ok).
 inline constexpr int kIq256Gather = 1;
 inline constexpr int kIq256Vnni = 2;
+/// kIq256Zen3: IQ3_S and IQ2_S without a gather (register-held grid indices), and for IQ2_S gate and up rows in one pass
+/// (IQ3_S: from two tokens; its one-token rows stay on the plain decode), STRATA_IQ_ZEN3=1, opt-in.  IQ3_XXS keeps its plain decode.  Takes the place of kIq256Gather.
+inline constexpr int kIq256Zen3 = 4;
 /// The variant iq256_gu_rows / iq256_rows take on the calling thread.
 int iq256_variant() noexcept;
 /// Every variant bit this build and this CPU can run (tests and benches).

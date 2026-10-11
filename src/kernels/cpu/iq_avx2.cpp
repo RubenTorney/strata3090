@@ -15,6 +15,11 @@
 // register and read with one vpgather, the same words into the same lanes, so the same bits.  Where it is faster
 // depends on the core, so STRATA_IQ256_GATHER picks it per thread (expert_layout.hpp, cpu_gather_fast_here).
 //
+// STRATA_IQ_ZEN3=1 (opt-in, kIq256Zen3) is the third decode for IQ3_S and IQ2_S, for cores whose gather is slow (Zen 3):
+// no gather and grid indices kept in scalar registers, gate and up rows in one pass for IQ2_S; IQ3_S takes the plain
+// decode at one token (faster there).  With it set a lone token of those two formats takes the multi-token kernels
+// (native_gu_mt_min).  The same bits as the other variants for the same token and width.
+//
 // Where the CPU has AVX-VNNI (cpu_avxvnni_ok: Alder Lake, Sapphire Rapids and later) the row kernels take a second
 // copy with vpdpwssd / vpdpbusd (iq_avx2_rows.inl), the same integer sums.
 //
@@ -42,6 +47,14 @@
 #define STRATA_AVXVNNI_FN __attribute__((target("avxvnni")))
 #else
 #define STRATA_AVXVNNI_FN
+#endif
+
+// The Zen 3 row entries (gu_zen3, dot_zen3 in iq_avx2_rows.inl) are not inlined: the gather / plain dispatchers keep
+// their code when STRATA_IQ_ZEN3 is unset.
+#if defined(_MSC_VER)
+#define STRATA_NOINLINE __declspec(noinline)
+#else
+#define STRATA_NOINLINE __attribute__((noinline))
 #endif
 
 namespace strata::kernels::cpu {
@@ -344,6 +357,52 @@ template <> struct Fmt32<122> {
     }
 };
 
+// ---- the Zen 3 decodes (STRATA_IQ_ZEN3, see iq256_variant): IQ3_S and IQ2_S, each its Fmt32 bit for bit, no gather.
+// Zen 3 has no fast gather (microcoded) and runs the grid lookups at ~5 GB/s per core, so what these change is what
+// surrounds the table loads: the grid indices stay in scalar registers (one unpack + vmovq/vpextrq, shifts and movzx)
+// instead of a store to sp[] and a reload per index.  IQ3_S joins its 32-bit entries in pairs in a scalar register (shl +
+// or, then vmovq + vpunpcklqdq); GCC 13 builds the plain form with vmovd + vpinsrd, and the same pairing made IQ3_XXS
+// slower than its plain decode in iq_avx2_parity --bench, so IQ3_XXS keeps Fmt32<18> in this variant.  The ymm is
+// assembled from two xmm halves (vinserti128; no vpermd / vperm2i128).  Faster or not is for --bench to say per format.
+inline __m128i pair_epi32(uint32_t a, uint32_t b, uint32_t c, uint32_t d) {
+    return _mm_unpacklo_epi64(_mm_cvtsi64_si128((long long) ((uint64_t) a | ((uint64_t) b << 32))),
+                              _mm_cvtsi64_si128((long long) ((uint64_t) c | ((uint64_t) d << 32))));
+}
+inline __m256i join128(__m128i lo, __m128i hi) { return _mm256_inserti128_si256(_mm256_castsi128_si256(lo), hi, 1); }
+
+template <> struct Fmt32<321> {   // IQ3_S
+    static constexpr int bytes = 110;
+    static constexpr float K = 1.0f;
+    static inline void decode(const uint8_t* b, int j, int half, __m256i& g, __m256i& sgn, __m256i& sc) {
+        const uint8_t* q = b + 2 + 16 * j + 8 * half;
+        const __m128i ix = _mm_unpacklo_epi8(_mm_cvtsi64_si128((long long) u64(q)),
+                                             _mm_cvtsi64_si128((long long) hi_spread.iq3s[b[66 + 2 * j + half]]));
+        const uint64_t i03 = (uint64_t) _mm_cvtsi128_si64(ix), i47 = (uint64_t) _mm_extract_epi64(ix, 1);
+#define G3S(w, k) iq3s_grid[((w) >> (16 * (k))) & 0xffff]
+        g = join128(pair_epi32(G3S(i03, 0), G3S(i03, 1), G3S(i03, 2), G3S(i03, 3)),
+                    pair_epi32(G3S(i47, 0), G3S(i47, 1), G3S(i47, 2), G3S(i47, 3)));
+#undef G3S
+        sgn = sgn_vec_at(b + 74 + 8 * j + 4 * half);
+        const uint8_t s = b[106 + j];
+        sc = scale_vec(scale_vecs.s32[half ? s >> 4 : s & 15]);
+    }
+};
+
+template <> struct Fmt32<322> {   // IQ2_S
+    static constexpr int bytes = 82;
+    static constexpr float K = 0.125f;
+    static inline void decode(const uint8_t* b, int j, int half, __m256i& g, __m256i& sgn, __m256i& sc) {
+        const __m128i ix = _mm_unpacklo_epi8(_mm_cvtsi32_si128((int) u32(b + 2 + 8 * j + 4 * half)),
+                                             _mm_cvtsi64_si128((long long) hi_spread.iq2s[b[66 + 2 * j + half]]));
+        const uint64_t i = (uint64_t) _mm_cvtsi128_si64(ix);   // four 16-bit indices
+#define G2S(k) _mm_loadl_epi64((const __m128i*) &iq2s_grid[((i) >> (16 * (k))) & 0xffff])
+        g = join128(_mm_unpacklo_epi64(G2S(0), G2S(1)), _mm_unpacklo_epi64(G2S(2), G2S(3)));
+#undef G2S
+        sgn = sgn_vec_at(b + 2 + 32 + 8 * j + 4 * half);
+        sc = scale_vec(scale_vecs.s16[b[74 + 2 * j + half]]);
+    }
+};
+
 template <> struct Fmt32<23> {   // IQ4_XS: d, scales_h, scales_l[4], qs[128] - 136 B, 8 signed sub-scales
     // ggml's ggml_vec_dot_iq4_xs_q8_K: the same 16-value codebook as IQ4_NL, but each of the eight 32-value
     // sub-blocks carries its own 6-bit scale, read as two nibbles of scales_l[p] plus two bits of scales_h, and
@@ -381,6 +440,13 @@ namespace vnni {
 #endif
 
 bool vnni_on() { return STRATA_AVXVNNI && cpu_avxvnni_ok(); }
+
+// STRATA_IQ_ZEN3=1 (opt-in): the Zen 3 decodes.  Plain AVX2 code, so no CPU check
+// beyond the engine's own cpu_avx2_ok(); read on first use.
+bool zen3_on() {
+    static const bool on = iq256_zen3_setting() != 0;
+    return on;
+}
 
 }  // namespace
 
@@ -457,36 +523,41 @@ int iq256_variant() noexcept {
     // STRATA_IQ256_GATHER=0/1 for every core; unset, where the calling thread's core gathers faster (per thread: a
     // hybrid CPU's pool runs on P- and E-cores).  AVX-VNNI where cpu_avxvnni_ok().  The same bits either way.
     const int s = iq256_gather_setting();
+    if (zen3_on()) return kIq256Zen3 | (vnni_on() ? kIq256Vnni : 0);   // no gather on Zen 3; the same bits
     return ((s >= 0 ? s == 1 : cpu_gather_fast_here()) ? kIq256Gather : 0) | (vnni_on() ? kIq256Vnni : 0);
 }
 
-int iq256_variants() noexcept { return kIq256Gather | (vnni_on() ? kIq256Vnni : 0); }
+int iq256_variants() noexcept { return kIq256Gather | kIq256Zen3 | (vnni_on() ? kIq256Vnni : 0); }
 
 void iq256_gu_rows_v(int variant, int type, const uint8_t* blob, size_t gu_row, size_t up_off, int n,
                      const void* const* act, int nt, float* const* ff, int r0, int r1) {
-    const bool g = (variant & kIq256Gather) != 0;
+    const int g = (variant & kIq256Zen3) ? 2 : (variant & kIq256Gather) != 0;
 #if STRATA_AVXVNNI
     if (variant & kIq256Vnni) {
-        if (g) vnni::gu_type<true>(type, nt, blob, gu_row, up_off, n, act, ff, r0, r1);
+        if (g == 2) vnni::gu_zen3(type, nt, blob, gu_row, up_off, n, act, ff, r0, r1);
+        else if (g) vnni::gu_type<true>(type, nt, blob, gu_row, up_off, n, act, ff, r0, r1);
         else vnni::gu_type<false>(type, nt, blob, gu_row, up_off, n, act, ff, r0, r1);
         return;
     }
 #endif
-    if (g) plain::gu_type<true>(type, nt, blob, gu_row, up_off, n, act, ff, r0, r1);
+    if (g == 2) plain::gu_zen3(type, nt, blob, gu_row, up_off, n, act, ff, r0, r1);
+    else if (g) plain::gu_type<true>(type, nt, blob, gu_row, up_off, n, act, ff, r0, r1);
     else plain::gu_type<false>(type, nt, blob, gu_row, up_off, n, act, ff, r0, r1);
 }
 
 void iq256_rows_v(int variant, int type, const uint8_t* w, size_t row_bytes, int n, const void* const* act, int nt,
                   float* const* out, int r0, int r1) {
-    const bool g = (variant & kIq256Gather) != 0;
+    const int g = (variant & kIq256Zen3) ? 2 : (variant & kIq256Gather) != 0;
 #if STRATA_AVXVNNI
     if (variant & kIq256Vnni) {
-        if (g) vnni::dot_type<true>(type, nt, w, row_bytes, n, act, out, r0, r1);
+        if (g == 2) vnni::dot_zen3(type, nt, w, row_bytes, n, act, out, r0, r1);
+        else if (g) vnni::dot_type<true>(type, nt, w, row_bytes, n, act, out, r0, r1);
         else vnni::dot_type<false>(type, nt, w, row_bytes, n, act, out, r0, r1);
         return;
     }
 #endif
-    if (g) plain::dot_type<true>(type, nt, w, row_bytes, n, act, out, r0, r1);
+    if (g == 2) plain::dot_zen3(type, nt, w, row_bytes, n, act, out, r0, r1);
+    else if (g) plain::dot_type<true>(type, nt, w, row_bytes, n, act, out, r0, r1);
     else plain::dot_type<false>(type, nt, w, row_bytes, n, act, out, r0, r1);
 }
 

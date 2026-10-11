@@ -1,6 +1,7 @@
 // src/core/expert_source.cpp - the adapter.  See the header for the three clauses of the contract.
 #include "strata/core/expert_source.hpp"
 #include "strata/core/foresight_swap.hpp"
+#include "strata/core/deterministic.hpp"
 #include "strata/core/on_device.hpp"
 #include "strata/platform/aux_cpus.hpp"
 #include "strata/core/remote_experts.hpp"
@@ -5075,6 +5076,10 @@ ForesightSwap* foresight_swap_from_env(int64_t layers, int64_t experts, const st
     const char* v = std::getenv("STRATA_FS_SLOTS");
     const int slots = v ? std::atoi(v) : 0;
     if (slots <= 0) return nullptr;
+    if (strata::core::deterministic_mode()) {   // a swap lands when its copy lands: which window computes the expert on the GPU is timed
+        std::fprintf(stderr, "strata serve: foresight swap: off under STRATA_DETERMINISTIC=1 (a landed copy is timing)\n");
+        return nullptr;
+    }
     if (const char* dp = std::getenv("STRATA_VERIFY_DEVICE_PLAN"); dp && std::atoi(dp) != 0) {
         std::fprintf(stderr, "strata serve: foresight swap: off beside STRATA_VERIFY_DEVICE_PLAN (the device would plan "
                              "resident layers without the host)\n");

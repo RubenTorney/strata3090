@@ -29,6 +29,7 @@
 #include "strata/core/coupled_draft.hpp"
 #include "strata/core/expert_source.hpp"
 #include "strata/core/foresight_swap.hpp"
+#include "strata/core/deterministic.hpp"
 #include "strata/core/pinned.hpp"
 #include "strata/core/remote_experts.hpp"
 #include "strata/core/on_device.hpp"
@@ -1314,7 +1315,7 @@ void mem_mark(const char* where) {
 
 /// #463's A/B: STRATA_ADAPT_NOWAIT=1 lets a verify window start before the adaptive tier's copies have landed (0.1.37)
 bool adapt_nowait() {
-    static const bool v = [] { const char* e = std::getenv("STRATA_ADAPT_NOWAIT"); return e && e[0] == '1'; }();
+    static const bool v = [] { const char* e = std::getenv("STRATA_ADAPT_NOWAIT"); return e && e[0] == '1' && !strata::core::deterministic_mode(); }();
     return v;
 }
 
@@ -2256,6 +2257,28 @@ int main(int argc, char** argv) {
     // --pcie-frac given: that one share is every stage's (the stages' own link probes are skipped), so a split over
     // a fast and a slow link cannot set the two apart from the command line (#485)
     const bool pcie_given = o.pcie_frac >= 0.0;
+    // STRATA_DETERMINISTIC=1 (opt-in; strata/core/deterministic.hpp): the decisions that come from the clock or a measurement are
+    // fixed, so two fresh engines with the same flags give the same tokens at temperature 0.  The draft policy picks a
+    // lookup window from measured round times (a different window shape moves experts between the CPU and the GPU, which
+    // round differently): no lookup drafts here.  The PCIe share is not probed or refined (below).  What the flags must fix
+    // is said once.
+    if (strata::core::deterministic_mode()) {
+        o.suffix_draft = 0;
+        o.lookup_chain = 0;
+        std::fprintf(stderr, "strata: STRATA_DETERMINISTIC=1: no lookup drafts (the draft policy reads round times), no PCIe probe or "
+                             "refinement, the asynchronous tier only where it is driven by the window count\n");
+        if (o.expert_cache < 0 || (o.expert_cache == 0 && !o.expert_profile.empty()))   // (0 with a profile means auto)
+            std::fprintf(stderr, "strata: STRATA_DETERMINISTIC=1 WARNING: the expert cache is sized from the free VRAM at start "
+                                 "(--expert-cache auto); give --expert-cache N for the same cache in every run\n");
+        if (o.prefill_auto)
+            std::fprintf(stderr, "strata: STRATA_DETERMINISTIC=1 WARNING: --prefill auto picks the chunk from the free VRAM; give "
+                                 "--prefill N for the same chunks in every run\n");
+        if (std::getenv("STRATA_ROUTE_TAIL_SKIP") == nullptr)
+            std::fprintf(stderr, "strata: STRATA_DETERMINISTIC=1 WARNING: STRATA_ROUTE_TAIL_SKIP is unset, so its default follows the "
+                                 "share of experts in the GPU cache; set it (7 or 0)\n");
+        if (o.pcie_frac < 0.0 && !o.layer_split.empty())
+            std::fprintf(stderr, "strata: STRATA_DETERMINISTIC=1 WARNING: a layer split probes each stage's link; give --pcie-frac\n");
+    }
     std::vector<int64_t> split_at;
     std::vector<int> split_devs;
     bool split_auto = false, split_same = false;
@@ -2734,7 +2757,13 @@ int main(int argc, char** argv) {
     // link (the copy kernel, since 0.1.14), so on a slower link it must shrink or the window waits for it.  The
     // real H2D bandwidth is probed once; from 20 GB/s up (x16 PCIe 4/5) the measured default stays.  The canonical
     // pack keeps 0.2 as its start value (0.1.43: PcieAuto refines it on CUDA).  `--calibrate` measures it outright.
-    if (o.pcie_frac < 0.0) {
+    if (o.pcie_frac < 0.0 && strata::core::deterministic_mode()) {
+        // STRATA_DETERMINISTIC=1: the start value of the model's rule, without the link probe and without PcieAuto
+        o.pcie_frac = native_pack ? 0.55 : 0.2;
+        o.pcie_frac_auto = false;
+        std::fprintf(stderr, "strata generate: STRATA_DETERMINISTIC=1: pcie_frac %.2f (the model's start value; no probe, no refinement)\n",
+                     o.pcie_frac);
+    } else if (o.pcie_frac < 0.0) {
         const double base = native_pack ? 0.55 : 0.2;
         std::string bursts;
         const char* pfd = std::getenv("STRATA_PCIE_FRAC_DEFAULT");
@@ -6900,6 +6929,10 @@ int main(int argc, char** argv) {
     }
     // (the arena mode has no RAM copy to exchange with: its experts are always in RAM, the tier only copies them in)
     if (o.adapt_async && !src.complement_ready() && srcp != &arena_src) adapt_async_off("the resident RAM mode is not running");
+    // STRATA_DETERMINISTIC=1: outside the arena mode the asynchronous tier flips a round when its copies have landed (timing);
+    // in the arena mode the next tick waits for them (a_wait below), so the window of a flip depends on the window count only
+    if (o.adapt_async && strata::core::deterministic_mode() && srcp != &arena_src)
+        adapt_async_off("STRATA_DETERMINISTIC=1: the flip of a round is timed by its copies outside the arena mode");
     // pp-opt: with the file tier unbuffered, the mapped view of experts.bin is only a fallback from here on - and while
     // it exists NTFS serves the unbuffered reads one at a time (drop_mapping).  STRATA_KEEP_MAPPING=1 keeps it (A/B).
     if (srcp == &src && src.unbuffered() && std::getenv("STRATA_KEEP_MAPPING") == nullptr) {
@@ -8667,7 +8700,7 @@ int main(int argc, char** argv) {
         // arena only (the other modes keep their steps as they were): the choice on this thread (STRATA_ADAPT_PICK_INLINE),
         // the wait for the copies (STRATA_ADAPT_ASYNC_WAIT), the copies in flight per tick (STRATA_ADAPT_ASYNC_BATCH, 0 = all)
         const bool a_inline = a_arena && a_env("STRATA_ADAPT_PICK_INLINE", 1) != 0;
-        const bool a_wait = a_arena && a_env("STRATA_ADAPT_ASYNC_WAIT", 1) != 0;
+        const bool a_wait = a_arena && (strata::core::deterministic_mode() || a_env("STRATA_ADAPT_ASYNC_WAIT", 1) != 0);
         const size_t a_batch = a_arena ? (size_t) std::max(0, a_env("STRATA_ADAPT_ASYNC_BATCH", 0)) : 0;
         // STRATA_ADAPT_ASYNC_DEMAND (arena only, default off): a round is sized by the demand - at most max(8, 4 x the CPU
         // jobs per window since the last round) swaps (multi_misses counts the experts the CPU ran, summed over the layers) -

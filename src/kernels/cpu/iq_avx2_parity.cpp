@@ -110,7 +110,7 @@ std::string variant_name(int v) {
 std::vector<int> subsets(int mask) {
     std::vector<int> v;
     for (int s = 0; s <= mask; ++s)
-        if ((s & ~mask) == 0) v.push_back(s);
+        if ((s & ~mask) == 0 && (s & 5) != 5) v.push_back(s);   // gather+zen3 dispatches as zen3
     return v;
 }
 
@@ -531,8 +531,8 @@ int main(int argc, char** argv) {
     auto env = [](const char* k) { const char* v = std::getenv(k); return v ? v : "-"; };
     std::printf("iq_avx2_parity: %s (avx2 %d, avx512 %d), CPU %d, core type %02Xh\n", cpu::cpu_name().c_str(),
                 (int) cpu::cpu_avx2_ok(), (int) cpu::cpu_avx512_ok(), pin, core_type());
-    std::printf("  STRATA_IQ256_GATHER %s, STRATA_NO_AVXVNNI %s, STRATA_IQ_MT_MIN %s, STRATA_IQ_PREFETCH %s\n",
-                env("STRATA_IQ256_GATHER"), env("STRATA_NO_AVXVNNI"), env("STRATA_IQ_MT_MIN"), env("STRATA_IQ_PREFETCH"));
+    std::printf("  STRATA_IQ256_GATHER %s, STRATA_IQ_ZEN3 %s, STRATA_NO_AVXVNNI %s, STRATA_IQ_MT_MIN %s, STRATA_IQ_PREFETCH %s\n",
+                env("STRATA_IQ256_GATHER"), env("STRATA_IQ_ZEN3"), env("STRATA_NO_AVXVNNI"), env("STRATA_IQ_MT_MIN"), env("STRATA_IQ_PREFETCH"));
     if (!cpu::cpu_avx2_ok()) {
         std::printf("iq_avx2_parity: no AVX2 here, nothing to check (the engine takes ggml-cpu's dot)\n");
         return 0;

@@ -208,6 +208,14 @@ int iq256_gather_setting() {
     return s;
 }
 
+int iq256_zen3_setting() {
+    static const int s = [] {
+        const char* v = std::getenv("STRATA_IQ_ZEN3");
+        return v != nullptr && std::atoi(v) != 0 ? 1 : 0;
+    }();
+    return s;
+}
+
 bool cpu_gather_fast() {
     static const bool ok = [] {
         if (cpu_isa_cap() < 3) return false;   // STRATA_FORCE_ISA: as on a CPU that stops at AVX2

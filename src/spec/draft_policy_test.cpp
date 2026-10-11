@@ -9,6 +9,7 @@
 #include "strata/spec/draft_policy.hpp"
 
 #include <cstdio>
+#include <limits>
 
 using strata::spec::DraftPolicy;
 
@@ -124,6 +125,55 @@ int main() {
         check(mtp_window_len(pr, 3, 0.0, 0.1) == 3, "window: the cap holds");
         const float zero[2] = {0.0f, 0.0f};
         check(mtp_window_len(zero, 3, 0.0, 0.1) == 1, "window: guesses never drafted (probability 0) are left out");
+    }
+    {   // the old inline rule (--spec-min-p alone), the NaN cases, the stop order, and the drafter's stop loop
+        using strata::spec::mtp_window_len;
+        const float nan = std::numeric_limits<float>::quiet_NaN();
+        auto old_rule = [](const float* d, int S, double mp) {
+            int T = 1;
+            while (T < S && d[T - 1] >= (float) mp) ++T;
+            return T;
+        };
+        // the drafter's loop in MtpDrafter::draft (min_p > 0 or cum_p > 0): how many drafts it computes
+        auto drafted = [](const float* d, int max_steps, float min_p, float cum_p) {
+            int n = 1;
+            float pj = d[0], cum = pj;
+            for (int j = 1; j < max_steps && pj >= min_p && cum >= cum_p; ++j) {
+                pj = d[j];
+                cum *= pj;
+                ++n;
+            }
+            return n;
+        };
+        const float edge[5] = {(float) 0.7, (float) 0.7, 0.69999f, 0.9f, 0.9f};
+        check(mtp_window_len(edge, 6, 0.7, 0.0) == old_rule(edge, 6, 0.7), "parity: dprob == (float)0.7 enters, 0.69999 stops");
+        check(mtp_window_len(edge, 6, 0.7, 0.0) == 3, "parity: that window is 3");
+        bool same = true;
+        const float vals[] = {0.0f, 0.3f, 0.5f, 0.69999f, (float) 0.7, 0.8f, 0.95f, 1.0f, nan};
+        for (float a : vals) for (float b : vals) for (float c : vals) {
+            const float d[3] = {a, b, c};
+            for (double mp : {0.0, 0.5, 0.7})
+                if (mp > 0.0 && mtp_window_len(d, 4, mp, 0.0) != old_rule(d, 4, mp)) same = false;
+        }
+        check(same, "parity: cum_p = 0 equals the old inline rule on a grid incl. NaN");
+        const float bad[3] = {0.9f, nan, 0.9f};
+        check(mtp_window_len(bad, 4, 0.7, 0.0) == 2, "NaN: --spec-min-p stops the window before it");
+        check(mtp_window_len(bad, 4, 0.0, 0.3) == 2, "NaN: cum-p alone stops the window before it");
+        const float lowq[3] = {0.6f, 0.99f, 0.99f};
+        check(mtp_window_len(lowq, 4, 0.7, 0.1) == 1, "min-p stops before cum-p (0.6 < 0.7, product 0.6 >= 0.1)");
+        const float lowc[3] = {0.8f, 0.8f, 0.8f};
+        check(mtp_window_len(lowc, 4, 0.7, 0.7) == 2, "cum-p stops what min-p keeps (0.8, 0.64)");
+        check(mtp_window_len(lowc, 1, 0.7, 0.7) == 1, "max_t = 1: a window of one");
+        check(mtp_window_len(lowc, 4, 0.0, 1.0) == 1, "P = 1.0: windows of one (0.8 < 1)");
+        bool atleast = true;
+        for (float a : vals) for (float b : vals) for (float c : vals) {
+            const float d[3] = {a, b, c};
+            for (double mp : {0.0, 0.7}) for (double cp : {0.0, 0.3, 0.5, 0.9}) {
+                if (mp <= 0.0 && cp <= 0.0) continue;
+                if (drafted(d, 3, (float) mp, (float) cp) < mtp_window_len(d, 4, mp, cp) - 1) atleast = false;
+            }
+        }
+        check(atleast, "the drafter's stop loop drafts at least T-1 guesses for every window");
     }
     std::printf(g_fail ? "FAIL\n" : "PASS\n");
     return g_fail ? 1 : 0;

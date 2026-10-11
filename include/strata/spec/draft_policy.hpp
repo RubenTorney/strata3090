@@ -25,12 +25,14 @@ namespace strata::spec {
 /// that product is the chance the whole window up to and including draft j is accepted, which is what one more row
 /// of the check is worth.  min_p = cum_p = 0: always `max_t`.
 inline int mtp_window_len(const float* dprob, int max_t, double min_p, double cum_p) {
+    // float throughout, in the negated form, as the drafter's own stop loop (MtpDrafter::draft): a NaN stops the window
+    const float mp = (float) min_p, cp = (float) cum_p;
     int t = 1;
-    double cum = 1.0;
+    float cum = 1.0f;
     while (t < max_t) {
-        const double q = dprob[t - 1];
+        const float q = dprob[t - 1];
         cum *= q;
-        if ((min_p > 0.0 && q < min_p) || (cum_p > 0.0 && cum < cum_p)) break;
+        if ((min_p > 0.0 && !(q >= mp)) || (cum_p > 0.0 && !(cum >= cp))) break;
         ++t;
     }
     return t;

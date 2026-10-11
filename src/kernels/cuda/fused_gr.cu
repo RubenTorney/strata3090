@@ -887,7 +887,7 @@ __global__ void __launch_bounds__(NT) gr_down_staged_kernel(GrMulti m) {
 }
 
 #if !defined(__HIPCC__)
-// STRATA_GR_SM86=1 (opt-in, sm_80+): gr_down_staged_kernel with the warp's whole weight row requested up front.  The staged kernel
+// STRATA_GR_SM86=1 / STRATA_GR_SM86_DOWN=1 (opt-in, sm_86 with at least 64 SMs): gr_down_staged_kernel with the warp's whole weight row requested up front.  The staged kernel
 // keeps one tile of weights ahead (5 uint4 a lane, a DRAM latency per tile of the 8, with two barriers between): ~20 KB a block in
 // flight.  Here a lane issues all 40 of its 16-byte loads of the row (lane + 32 i, i < 40: the staged kernel's chunks, tile h
 // chunk q = i = 5 h + q) before the first activation tile lands, so the latency is paid once and 128 B-aligned warp
@@ -960,6 +960,83 @@ __global__ void __launch_bounds__(NT) gr_down_s86_kernel(GrMulti m) {
         }
     }
 }
+// STRATA_GR_ACT_AHEAD=1: gr_down_s86_kernel with NBUF activation tiles in flight instead of two (the staged kernel's 8-deep
+// chain of one cp.async tile ahead, two barriers each).  NBUF buffers of [T][2][160] float4; tile h sits in buffer h % NBUF,
+// NBUF - 1 tiles are requested before the loop and tile h + NBUF - 1 is requested right after the barrier that ends the
+// use of its buffer (tile h - 1), so one barrier a tile.  NBUF = 8 holds the whole of a window of 1-2 tokens (T x 40 KB).
+// The weights, the lane's chunk order and every fmaf are gr_down_s86_kernel's: bitwise the same sums.
+template <int N>
+__device__ __forceinline__ void cp_async_wait_n() {
+#if defined(STRATA_GR_CP_ASYNC)
+    asm volatile("cp.async.wait_group %0;\n" ::"n"(N) : "memory");
+#endif
+}
+template <int MAX_T, bool EXACT_T, int NBUF, int NT = 128>
+__global__ void __launch_bounds__(NT) gr_down_s86a_kernel(GrMulti m) {
+    constexpr int WARPS = NT / 32;
+    constexpr int DOWN_BLOCKS = LR / WARPS;
+    constexpr int NCH = N_HTILES * HQ;
+    extern __shared__ __align__(16) float4 hbuf[];      // NBUF buffers x [T][2][160] float4
+    const int t = threadIdx.x, lane = t & 31, warp = t >> 5;
+    const int T = EXACT_T ? MAX_T : m.T;
+    const bool inject_block = blockIdx.x == DOWN_BLOCKS;
+    const int row = inject_block ? warp : blockIdx.x * WARPS + warp;
+    const bool active = !(inject_block && (m.a[0].w_inject == nullptr || warp >= HC));
+    const uint16_t* wrow = (inject_block ? m.a[0].w_inject : m.a[0].w_down) + (size_t) (active ? row : 0) * D;
+    const uint4* w4 = reinterpret_cast<const uint4*>(wrow);
+    const size_t buf_f4 = (size_t) T * (H_TILE / 4);
+    float acc[MAX_T];
+#pragma unroll
+    for (int k = 0; k < MAX_T; ++k) acc[k] = 0.0f;
+    uint4 wall[NCH];
+    if (active) {
+#pragma unroll
+        for (int i = 0; i < NCH; ++i) wall[i] = __ldg(w4 + lane + 32 * i);
+    }
+#pragma unroll
+    for (int h = 0; h < NBUF - 1; ++h) {                // tiles 0 .. NBUF - 2 (NBUF <= 8, so all exist)
+        stage_htile<NT>(m, T, h, hbuf + (size_t) h * buf_f4, t);
+        cp_async_commit();
+    }
+#pragma unroll
+    for (int h = 0; h < N_HTILES; ++h) {
+        cp_async_wait_n<NBUF - 2>();                    // groups so far: NBUF - 1 + h; tile h is the (h + 1)-th
+        __syncthreads();                                // tile h landed for every thread; tile h - 1 is consumed
+        if (h + NBUF - 1 < N_HTILES) stage_htile<NT>(m, T, h + NBUF - 1, hbuf + (size_t) ((h + NBUF - 1) % NBUF) * buf_f4, t);
+        cp_async_commit();                              // an empty group at the end keeps the wait count constant
+        const float4* cur = hbuf + (size_t) (h % NBUF) * buf_f4;
+        if (active) {
+#pragma unroll
+            for (int q = 0; q < HQ; ++q) {
+                const int j = lane + 32 * q;
+                const Bf16x8 wvq = unpack8(wall[h * HQ + q]);
+#pragma unroll
+                for (int k = 0; k < MAX_T; ++k) {
+                    if (EXACT_T || k < T) {
+                        const float4* pk = cur + (size_t) k * (H_TILE / 4);
+                        acc[k] += dot8u(wvq, pk[j], pk[H_TILE / 8 + j]);
+                    }
+                }
+            }
+        }
+    }
+    if (!active) return;
+    float s[MAX_T];
+#pragma unroll
+    for (int k = 0; k < MAX_T; ++k) s[k] = (EXACT_T || k < T) ? warp_sum(acc[k]) : 0.0f;
+#pragma unroll
+    for (int k = 0; k < MAX_T; ++k) {
+        if ((!EXACT_T && k >= T) || lane != k) continue;
+        if (inject_block) {
+            m.a[k].inject_out[row] = s[k];
+        } else {
+            const float x = s[k] / (float) HC;
+            m.a[k].lo[row] = x / (1.0f + __expf(-x));
+        }
+    }
+}
+// the buffers a window of ct tokens gets: as many as 99 KB hold (T x 5 KB each), at most the 8 tiles
+constexpr int s86a_nbuf(int ct) { return ct <= 2 ? 8 : (ct <= 4 ? 4 : (ct <= 6 ? 3 : 2)); }
 #endif
 
 // the current device is Volta (sm_70): the fast norm/up is its default
@@ -1056,6 +1133,19 @@ int down_chunk(bool staged, int* tile_out) {
         set_staged_attr(gr_down_s86_kernel<5, true>, 5);
         set_staged_attr(gr_down_s86_kernel<6, true>, 6);
         set_staged_attr(gr_down_s86_kernel<kFusedGrMaxT, false>, kFusedGrMaxT);
+        auto set_s86a_attr = [&](auto kernel, int max_t, int nbuf) {   // STRATA_GR_ACT_AHEAD: max_t * nbuf tiles
+            int ws = max_t * nbuf * H_TILE * (int) sizeof(float);
+            if (optin > 0 && ws > optin) ws = optin;
+            if (ws > 48 * 1024) cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, ws);
+            cudaFuncSetAttribute(kernel, cudaFuncAttributePreferredSharedMemoryCarveout, 100);
+        };
+        set_s86a_attr(gr_down_s86a_kernel<1, true, s86a_nbuf(1)>, 1, s86a_nbuf(1));
+        set_s86a_attr(gr_down_s86a_kernel<2, true, s86a_nbuf(2)>, 2, s86a_nbuf(2));
+        set_s86a_attr(gr_down_s86a_kernel<3, true, s86a_nbuf(3)>, 3, s86a_nbuf(3));
+        set_s86a_attr(gr_down_s86a_kernel<4, true, s86a_nbuf(4)>, 4, s86a_nbuf(4));
+        set_s86a_attr(gr_down_s86a_kernel<5, true, s86a_nbuf(5)>, 5, s86a_nbuf(5));
+        set_s86a_attr(gr_down_s86a_kernel<6, true, s86a_nbuf(6)>, 6, s86a_nbuf(6));
+        set_s86a_attr(gr_down_s86a_kernel<kFusedGrMaxT, false, 2>, kFusedGrMaxT, 2);
 #endif
         cudaGetLastError();      // drop any error the attempt left behind
         // The opt-in is a promise a pre-Volta card does not keep: an sm_60 answers 65536 and accepts the
@@ -1090,6 +1180,7 @@ __global__ void __launch_bounds__(THREADS) gr_norm_fast_kernel(GrMulti m);   // 
 __global__ void __launch_bounds__(THREADS) gr_up_fast_kernel(GrMulti m);
 }  // namespace
 static bool gr_fast();
+static bool gr_fast_off();   // STRATA_GR_FAST=0 or fused_gr_set_fast(0)
 namespace {
 #endif
 // STRATA_GR_DOWN_MAX4=1 (opt-in): launches of up to 4 tokens hold 4 tokens' sums per thread instead of kFusedGrMaxT (the
@@ -1122,31 +1213,65 @@ bool gr_128_on() {
     return on[dev] && !g_wide_bad[dev].load();
 }
 
-// STRATA_GR_SM86=1 (opt-in, read once; CUDA devices of compute capability 8.x): the hyper-connection read with the
-// whole-row weight prefetch down kernel (gr_down_s86_kernel), the register norm (gr_norm_split_fast_kernel) and the
-// latency-hidden up (gr_up_fast_kernel); each of them computes the default read's sums in the default order.
-bool gr_s86_on() {
-#if defined(__HIPCC__)
-    return false;
-#else
+// STRATA_GR_SM86 (opt-in, read once; CUDA devices of compute capability 8.6 with at least 64 SMs, the test of
+// STRATA_GR_128): the hyper-connection read with three kernels, each computing the default read's sums in the default
+// order.  Bits of the mask:  kS86Down  gr_down_s86_kernel (the whole-row weight prefetch)
+//                            kS86Norm  gr_norm_split_fast_kernel (the register norm; gfx12-only before)
+//                            kS86Up    gr_up_fast_kernel (the latency-hidden up; STRATA_GR_FAST=1 already enables it on its own
+//                                      on CUDA, so it has no switch of its own here; an explicit STRATA_GR_FAST=0 /
+//                                      fused_gr_set_fast(0) keeps it off)
+//                            kS86Act   gr_down_s86a_kernel instead of the down kernel (STRATA_GR_ACT_AHEAD: more activation tiles in flight)
+// STRATA_GR_SM86=1 asks for Down + Norm + Up, STRATA_GR_SM86_DOWN=1 for the down kernel alone, STRATA_GR_ACT_AHEAD=1 for
+// the down kernel with the deeper activation pipeline.  Nothing is used before fused_gr_check has compared the kernels
+// with the default ones bit for bit on this card (g_s86_ok); a failure or STRATA_HC_SPLIT=0 leaves the default kernels.
+constexpr unsigned kS86Down = 1, kS86Norm = 2, kS86Up = 4, kS86Act = 8;
+constexpr unsigned kS86Force = 16;   // the start-up check only: use the kernels even where STRATA_GR_128 would take the down read
+#if !defined(__HIPCC__)
+std::atomic<unsigned> g_s86_ok[64];   // per device: the mask fused_gr_check approved (0 = none, or not checked yet)
+// the mask asked for by the environment on this card (0 on any other card)
+unsigned gr_s86_requested(int dev) {
     static bool known[64] = {};
-    static bool on[64] = {};
-    int dev = 0;
-    if (cudaGetDevice(&dev) != cudaSuccess || dev < 0 || dev >= 64) return false;
+    static unsigned req[64] = {};
+    if (dev < 0 || dev >= 64) return 0;
     if (!known[dev]) {
-        const char* v = std::getenv("STRATA_GR_SM86");
-        int cc_maj = 0;
+        auto flag = [](const char* name) { const char* v = std::getenv(name); return v != nullptr && std::atoi(v) != 0; };
+        unsigned r = 0;
+        if (flag("STRATA_GR_SM86")) r |= kS86Down | kS86Norm | kS86Up;
+        if (flag("STRATA_GR_SM86_DOWN")) r |= kS86Down;
+        if (flag("STRATA_GR_ACT_AHEAD")) r |= kS86Down | kS86Act;
+        int cc_maj = 0, cc_min = 0, sms = 0;
         cudaDeviceGetAttribute(&cc_maj, cudaDevAttrComputeCapabilityMajor, dev);
-        on[dev] = v != nullptr && std::atoi(v) != 0 && strata::cc_major_of(cc_maj) == 8;
+        cudaDeviceGetAttribute(&cc_min, cudaDevAttrComputeCapabilityMinor, dev);
+        cudaDeviceGetAttribute(&sms, cudaDevAttrMultiProcessorCount, dev);
+        if (strata::cc_major_of(cc_maj) != 8 || strata::cc_minor_of(cc_min) != 6 || sms < 64) r = 0;
+        req[dev] = r;
         known[dev] = true;
     }
-    return on[dev];
+    return req[dev];
+}
+// the kernels launch_multi may use on the current device
+[[maybe_unused]] unsigned gr_s86_mask() {
+    int dev = 0;
+    if (cudaGetDevice(&dev) != cudaSuccess || dev < 0 || dev >= 64) return 0;
+    return g_s86_ok[dev].load();
+}
+#else
+std::atomic<unsigned> g_s86_ok[64];
+[[maybe_unused]] unsigned gr_s86_requested(int) { return 0; }
+[[maybe_unused]] unsigned gr_s86_mask() { return 0; }
 #endif
+// any of the three switches set (on any card)
+[[maybe_unused]] bool s86_env_asked() {
+    for (const char* n : {"STRATA_GR_SM86", "STRATA_GR_SM86_DOWN", "STRATA_GR_ACT_AHEAD"}) {
+        const char* v = std::getenv(n);
+        if (v != nullptr && std::atoi(v) != 0) return true;
+    }
+    return false;
 }
 
 // the split norm with registers (gr_norm_split_fast_kernel): gfx12 only until another arch is measured;
 // STRATA_GR_NORM_FAST=0 / 1 forces it off / on
-bool norm_fast_on() {
+[[maybe_unused]] bool norm_fast_on(unsigned opt) {
 #if defined(__HIPCC__)
     static const int env = [] { const char* e = std::getenv("STRATA_GR_NORM_FAST"); return e != nullptr ? (std::atoi(e) != 0 ? 1 : 0) : -1; }();
     if (env >= 0) return env != 0;
@@ -1159,7 +1284,7 @@ bool norm_fast_on() {
     }
     return per_dev[dev] == 2;
 #else
-    return gr_s86_on();   // CUDA: only under STRATA_GR_SM86=1
+    return (opt & kS86Norm) != 0;   // CUDA: only under STRATA_GR_SM86=1, once the check approved it
 #endif
 }
 
@@ -1168,26 +1293,28 @@ bool qfuse_hc_local() {
     static const bool on = [] { const char* e = std::getenv("STRATA_QFUSE_HC_LOCAL"); return e == nullptr || std::atoi(e) != 0; }();
     return on;
 }
-void launch_multi(const GrMulti& m, int variant, cudaStream_t st, unsigned long long* stamp_buf, int stamp_i0) {
+// `opt`: the kS86 kernels this launch may use (0 = the default kernels; fused_gr_read_multi passes gr_s86_mask())
+void launch_multi(const GrMulti& m, int variant, cudaStream_t st, unsigned long long* stamp_buf, int stamp_i0,
+                  unsigned opt = 0) {
     const int n_tok = m.T;
 #if STRATA_GR_FAST_BUILD
     // gfx906: the latency-hidden norm/up (STRATA_GR_FAST=0: off) - the same sums in the same order as the kernels
     // they replace (gr_parity checks the multi-token read against single-token calls bitwise)
-    const bool fast = gr_fast() || gr_s86_on();   // STRATA_GR_SM86 takes the up kernel of STRATA_GR_FAST too
+    const bool fast = gr_fast() || ((opt & kS86Up) != 0 && !gr_fast_off());   // an explicit STRATA_GR_FAST=0 stays off
     if (variant >= kHcSplit) {
-        if (norm_fast_on()) gr_norm_split_fast_kernel<<<dim3((unsigned) n_tok, HC), THREADS, 0, st>>>(m);
+        if (norm_fast_on(opt)) gr_norm_split_fast_kernel<<<dim3((unsigned) n_tok, HC), THREADS, 0, st>>>(m);
         else gr_norm_split_kernel<<<dim3((unsigned) n_tok, HC), THREADS, 0, st>>>(m);
     } else if (fast) gr_norm_fast_kernel<<<n_tok, THREADS, 0, st>>>(m);
     else gr_norm_multi_kernel<<<n_tok, THREADS, 0, st>>>(m);
 #else
     if (variant >= kHcSplit) {
-        if (norm_fast_on()) gr_norm_split_fast_kernel<<<dim3((unsigned) n_tok, HC), THREADS, 0, st>>>(m);
+        if (norm_fast_on(opt)) gr_norm_split_fast_kernel<<<dim3((unsigned) n_tok, HC), THREADS, 0, st>>>(m);
         else gr_norm_split_kernel<<<dim3((unsigned) n_tok, HC), THREADS, 0, st>>>(m);
     } else gr_norm_multi_kernel<<<n_tok, THREADS, 0, st>>>(m);
 #endif
     if (stamp_buf) gpu_stamp(stamp_buf, stamp_i0, (void*) st);
     const bool staged = variant >= kHcStaged;
-    const bool wide = staged && (variant == kHcStaged128 || gr_128_on());   // 128-thread down blocks
+    const bool wide = staged && (variant == kHcStaged128 || (gr_128_on() && (opt & kS86Force) == 0));   // 128-thread down blocks
     int tv = 2560;
     const int chunk_tok = down_chunk(staged, &tv);
     const size_t per_tok = (staged ? (size_t) 2 * H_TILE : (size_t) tv) * sizeof(float);
@@ -1215,7 +1342,18 @@ void launch_multi(const GrMulti& m, int variant, cudaStream_t st, unsigned long 
             // #783 PR-g (stuchapin909): a launch of exactly ct <= 6 tokens is its own instantiation, the loop bounds
             // are compile-time (the same sums in the same order); STRATA_NO_MULTI_GR=1 keeps the generic kernels
 #if !defined(__HIPCC__)
-            if (!wide && variant != kHcStaged128 && gr_s86_on()) {   // STRATA_GR_SM86: 80 + 1 blocks of 128, the row's weights up front
+            if (!wide && (opt & kS86Down) != 0 && (opt & kS86Act) != 0) {   // STRATA_GR_ACT_AHEAD: the deeper activation pipeline
+                constexpr int WB = LR / 4;
+                const size_t asm_ = (size_t) ct * s86a_nbuf(ct) * H_TILE * sizeof(float);
+                if (exact_t && ct == 1) gr_down_s86a_kernel<1, true, s86a_nbuf(1)><<<WB + 1, 128, asm_, st>>>(c);
+                else if (exact_t && ct == 2) gr_down_s86a_kernel<2, true, s86a_nbuf(2)><<<WB + 1, 128, asm_, st>>>(c);
+                else if (exact_t && ct == 3) gr_down_s86a_kernel<3, true, s86a_nbuf(3)><<<WB + 1, 128, asm_, st>>>(c);
+                else if (exact_t && ct == 4) gr_down_s86a_kernel<4, true, s86a_nbuf(4)><<<WB + 1, 128, asm_, st>>>(c);
+                else if (exact_t && ct == 5) gr_down_s86a_kernel<5, true, s86a_nbuf(5)><<<WB + 1, 128, asm_, st>>>(c);
+                else if (exact_t && ct == 6) gr_down_s86a_kernel<6, true, s86a_nbuf(6)><<<WB + 1, 128, asm_, st>>>(c);
+                else gr_down_s86a_kernel<kFusedGrMaxT, false, 2><<<WB + 1, 128, (size_t) ct * 2 * H_TILE * sizeof(float), st>>>(c);   // generic: 2 buffers
+            } else
+            if (!wide && (opt & kS86Down) != 0) {   // STRATA_GR_SM86: 80 + 1 blocks of 128, the row's weights up front
                 constexpr int WB = LR / 4;
                 if (exact_t && ct == 1) gr_down_s86_kernel<1, true><<<WB + 1, 128, smem, st>>>(c);
                 else if (exact_t && ct == 2) gr_down_s86_kernel<2, true><<<WB + 1, 128, smem, st>>>(c);
@@ -1987,6 +2125,10 @@ static bool gr_fast() {
     { const char* v = std::getenv("STRATA_SM70_TABLE"); return cur_dev_volta() && v != nullptr && std::atoi(v) != 0; }   // PR 1401: opt-in   // CUDA: on Volta (V100-SXM2: 50.9 -> 46.7 us a read at T 1, bitwise); elsewhere opt-in
 #endif
 }
+static bool gr_fast_off() {
+    static const bool env0 = [] { const char* v = std::getenv("STRATA_GR_FAST"); return v != nullptr && std::atoi(v) == 0; }();
+    return g_gr_fast == 0 || (g_gr_fast < 0 && env0);
+}
 #else
 int g_gr_fast = -1;
 #endif
@@ -2118,7 +2260,7 @@ bool fused_gr_read_multi(const FusedGrArgs* a, int n_tok, float* xn_scratch, voi
     }
 #endif
     // the default read (STRATA_GR_V3 unset): v1, or the bitwise-equal v2 / v3 this card's check accepted
-    launch_multi(m, fused_gr_variant(), st, stamp_buf, stamp_i0);
+    launch_multi(m, fused_gr_variant(), st, stamp_buf, stamp_i0, gr_s86_mask());
     const cudaError_t e = cudaGetLastError();
     if (e != cudaSuccess) {
         std::fprintf(stderr, "fused_gr_read_multi: %s\n", cudaGetErrorString(e));
@@ -2155,9 +2297,14 @@ namespace {
 /// 1..8 tokens, with and without the pending write; every output of split and staged compared with the plain read's
 /// bit for bit (and the plain read's with the single-token read's).  `why[v]` gets the first difference of variant
 /// v; false if the check itself could not run.
-bool fused_gr_selftest(bool ok_variant[5], std::string why[5]) {
+bool fused_gr_selftest(bool ok_variant[7], std::string why[7]) {
     constexpr int TM = kFusedGrMaxT;
-    constexpr int NV = 5;                             // sets: 0 = plain, 1 = split, 2 = staged, 3 = single-token, 4 = staged 128
+    constexpr int NV = 7;                             // sets: 0 = plain, 1 = split, 2 = staged, 3 = single-token, 4 = staged 128,
+                                                      //       5 = STRATA_GR_SM86 kernels, 6 = + STRATA_GR_ACT_AHEAD (when asked for)
+    int dev_ = 0;
+    cudaGetDevice(&dev_);
+    const unsigned req86 = gr_s86_requested(dev_);
+    const unsigned m5 = req86 & (kS86Down | kS86Norm | kS86Up), m6 = (req86 & kS86Act) ? (m5 | kS86Act) : 0;
     std::mt19937 rng(20260930u);
     std::normal_distribution<float> nd(0.0f, 1.0f);
     std::vector<uint16_t> h_down((size_t) LR * D), h_up((size_t) D * LR), h_inj((size_t) HC * D);
@@ -2169,7 +2316,7 @@ bool fused_gr_selftest(bool ok_variant[5], std::string why[5]) {
     for (auto& x : h_R) x = nd(rng);
     for (auto& x : h_bo) x = 0.5f * nd(rng);
     for (auto& x : h_ip) x = 2.0f * nd(rng);
-    for (int v = 0; v < 5; ++v) { ok_variant[v] = v == 1; why[v].clear(); }
+    for (int v = 0; v < 7; ++v) { ok_variant[v] = v == 1; why[v].clear(); }
 
     const size_t n_set = (size_t) TM * (D + D + LR + HC + HC + N);   // R_out, xn, lo, rs, inject, mixed (floats)
     const size_t bytes = h_down.size() * 2 + h_up.size() * 2 + h_inj.size() * 2 +
@@ -2239,6 +2386,8 @@ bool fused_gr_selftest(bool ok_variant[5], std::string why[5]) {
                same(s1.R_out, s2.R_out, (size_t) T * D, "R", T, apply, w);
     };
     ok_variant[2] = ok_variant[3] = ok_variant[4] = ok;
+    ok_variant[5] = ok && m5 != 0;
+    ok_variant[6] = ok && m6 != 0;
     bool single_ok = ok;
     for (int apply = 0; apply < 2 && ok; ++apply) {
         for (int T = 1; T <= TM && ok; ++T) {
@@ -2269,6 +2418,14 @@ bool fused_gr_selftest(bool ok_variant[5], std::string why[5]) {
                 m.T = T;
                 launch_multi(m, kHcStaged128, st, nullptr, 0);
             }
+            for (int v = 5; v <= 6; ++v) {   // sets 5 / 6: the staged read with the STRATA_GR_SM86 kernels, compared below with set 0
+                if (!(v == 5 ? m5 != 0 : m6 != 0)) continue;
+                GrMulti m;
+                for (int k = 0; k < T; ++k) m.a[k] = a[v][k];
+                m.xn = set[v].xn;
+                m.T = T;
+                launch_multi(m, kHcStaged, st, nullptr, 0, (v == 5 ? m5 : m6) | kS86Force);
+            }
             if (T == 1) fused_gr_read(a[3][0], st);
             if (cudaGetLastError() != cudaSuccess || cudaStreamSynchronize(st) != cudaSuccess) {
                 why[0] = "a kernel of the check failed";
@@ -2278,12 +2435,16 @@ bool fused_gr_selftest(bool ok_variant[5], std::string why[5]) {
             if (ok_variant[2] && !all_same(set[0], set[1], T, apply, why[2])) ok_variant[2] = false;
             if (ok && ok_variant[3] && !all_same(set[0], set[2], T, apply, why[3])) ok_variant[3] = false;
             if (ok && ok_variant[4] && !all_same(set[2], set[4], T, apply, why[4])) ok_variant[4] = false;
+            if (ok && ok_variant[5] && !all_same(set[0], set[5], T, apply, why[5])) ok_variant[5] = false;
+            if (ok && ok_variant[6] && !all_same(set[0], set[6], T, apply, why[6])) ok_variant[6] = false;
             if (ok && T == 1 && single_ok && !all_same(set[3], set[0], T, apply, why[1])) single_ok = false;
         }
     }
     if (!single_ok && ok) {                            // the plain read itself disagrees with the single-token read
         why[2] = why[3] = "the plain read differs from the single-token read: " + why[1];
         ok_variant[2] = ok_variant[3] = ok_variant[4] = false;
+        why[5] = why[6] = why[2];
+        ok_variant[5] = ok_variant[6] = false;
     }
     if (st != nullptr) {
         cudaStreamSynchronize(st);
@@ -2291,7 +2452,7 @@ bool fused_gr_selftest(bool ok_variant[5], std::string why[5]) {
     }
     cudaFree(base);
     cudaGetLastError();
-    if (!ok) ok_variant[2] = ok_variant[3] = ok_variant[4] = false;
+    if (!ok) ok_variant[2] = ok_variant[3] = ok_variant[4] = ok_variant[5] = ok_variant[6] = false;
     return ok;
 }
 
@@ -2316,10 +2477,13 @@ void fused_gr_check() {
         g_variant[dev].store(kHcPlain);
         std::fprintf(stderr, "strata hc: CUDA%d: the hyper-connection read runs as the plain one (STRATA_HC_SPLIT=0)\n",
                      dev);
+        if (s86_env_asked())
+            std::fprintf(stderr, "strata hc: CUDA%d: STRATA_GR_SM86 / _DOWN / STRATA_GR_ACT_AHEAD not used: STRATA_HC_SPLIT=0 "
+                                 "skips the check that approves them\n", dev);
         return;
     }
-    bool okv[5];
-    std::string why[5];
+    bool okv[7];
+    std::string why[7];
     const bool ran = fused_gr_selftest(okv, why);
     if (ran && !okv[4]) g_wide_bad[dev].store(true);
     if (ran && !okv[4])
@@ -2329,6 +2493,37 @@ void fused_gr_check() {
     if (want >= kHcStaged && okv[kHcStaged]) use = kHcStaged;
     else if (okv[kHcSplit]) use = kHcSplit;
     g_variant[dev].store(use);
+    {   // STRATA_GR_SM86 / _DOWN / STRATA_GR_ACT_AHEAD: approved only for the staged read, only after set 5 / 6 matched the default kernels
+        const unsigned req = gr_s86_requested(dev);
+        unsigned ok86 = 0;
+        if (req != 0 && ran && use == kHcStaged) {
+            if ((req & kS86Act) != 0 && okv[6]) ok86 = req;
+            else if ((req & (kS86Down | kS86Norm | kS86Up)) != 0 && okv[5]) ok86 = req & ~kS86Act;
+        }
+        if (req != 0 && ran && !okv[5])
+            std::fprintf(stderr, "strata hc: CUDA%d: STRATA_GR_SM86 kernels differ from the default read on this card - not used: %s\n",
+                         dev, why[5].c_str());
+        if (req != 0 && ran && (req & kS86Act) != 0 && !okv[6])
+            std::fprintf(stderr, "strata hc: CUDA%d: STRATA_GR_ACT_AHEAD kernel differs from the default read on this card - not used: %s\n",
+                         dev, why[6].c_str());
+        g_s86_ok[dev].store(ok86);
+        if (ok86 != 0) {
+            const bool wide = gr_128_on();
+#if STRATA_GR_FAST_BUILD
+            const bool up = (ok86 & kS86Up) != 0 && !gr_fast_off();
+#else
+            const bool up = false;
+#endif
+            std::fprintf(stderr, "strata hc: CUDA%d: STRATA_GR_SM86 active (checked bit for bit against the default read): %s%s%s%s\n",
+                         dev, wide ? "" : ((ok86 & kS86Act) ? "down kernel with the whole row prefetched and deeper activation tiles" : "down kernel with the whole row prefetched"),
+                         wide ? "down kernel not used (STRATA_GR_128=1 takes the down read)" : "",
+                         (ok86 & kS86Norm) ? ", register norm" : "", up ? ", latency-hidden up" : "");
+        } else if (s86_env_asked()) {
+            std::fprintf(stderr, "strata hc: CUDA%d: STRATA_GR_SM86 / _DOWN / STRATA_GR_ACT_AHEAD requested but not used: %s\n", dev,
+                         req == 0 ? "this card is not an sm_86 with at least 64 SMs"
+                                  : (!ran ? "the check could not run" : (use != kHcStaged ? "the staged read is not in use" : "the check failed")));
+        }
+    }
     if (!ran)
         std::fprintf(stderr, "strata hc: CUDA%d: the check of split/staged could not run (%s)\n", dev, why[0].c_str());
     static const char* const name[4] = {"", "plain", "split", "staged"};

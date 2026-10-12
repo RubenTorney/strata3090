@@ -1,0 +1,15 @@
+  round 0 warm: median 123.2 tok/s over 12 prompts
+  round 0 ref: median 123.1 tok/s over 12 prompts
+  round 0 dfbranch: median 123.2 tok/s over 12 prompts
+  round 0 dfpdl: median 122.9 tok/s over 12 prompts
+  round 0 lfuse: median 122.8 tok/s over 12 prompts
+  round 0 gdnsplit: median 122.8 tok/s over 12 prompts
+  round 0 tsum: median 122.8 tok/s over 12 prompts
+  round 0 fuseheadgr: median 120.8 tok/s over 12 prompts
+  round 0 qdedup: median 122.6 tok/s over 12 prompts
+  round 0 q8packed: median 122.7 tok/s over 12 prompts
+  round 0 q6packed: median 118.6 tok/s over 12 prompts
+    raise HTTPError(req.full_url, code, msg, hdrs, fp)
+urllib.error.HTTPError: HTTP Error 400: Bad Request
+  round 0 routeres05: median 120.6 tok/s over 12 prompts
+  round 0 ref_end: median 122.5 tok/s over 12 prompts

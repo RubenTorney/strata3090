@@ -1,0 +1,20 @@
+WARNING: --no-deterministic: nothing is pinned; hashes may differ run to run
+[max_int8_r0] start, free RAM 59.8 GB
+[max_int8_r0] up after 27 s
+  round 0 max_int8: median 97.0 tok/s over 5 prompts
+[max_k8v4_r0] start, free RAM 59.8 GB
+[max_k8v4_r0] up after 27 s
+  round 0 max_k8v4: median 100.2 tok/s over 5 prompts
+[max_k8v4_r1] start, free RAM 59.8 GB
+[max_k8v4_r1] up after 27 s
+  round 1 max_k8v4: median 95.4 tok/s over 5 prompts
+[max_int8_r1] start, free RAM 59.8 GB
+[max_int8_r1] up after 27 s
+  round 1 max_int8: median 94.0 tok/s over 5 prompts
+max_int8: median 95.5 tok/s over all 5 prompts (not paired)
+max_k8v4: median 96.8 tok/s over all 5 prompts (not paired)
+
+max_k8v4 vs max_int8: no prompt with identical text: no ratio
+  WARNING: only 0/5 prompts are comparable: a ratio over a minority is not the arm's speed
+  text diverged (excluded): prompts [0] - the arms did different work there. Excluding them selects the prompts where the change did not alter the text, which can bias the ratio
+  arm not self-consistent (repeats differ, excluded): prompts [1, 2, 3, 4]

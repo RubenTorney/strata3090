@@ -1,3 +1,10 @@
+> **strata3090** : une branche de Strata réglée et mesurée pour une RTX 3090 24 Go (Linux, Ryzen 5 5600X, Qwen3.8-Flash-Next
+> IQ3_S, contexte 262 144). Configuration, mesures et mode vision : **[docs/RTX3090.md](docs/RTX3090.md)**.
+>
+> ![Débit à contexte court](docs/img/short_context.png)
+> ![Débit selon le remplissage du contexte](docs/img/long_context.png)
+> ![Mode vision](docs/img/vision.png)
+
 <h1 align="center">Strata</h1>
 
 **English** · [简体中文](README.zh-CN.md) · [日本語](README.ja.md) · [Deutsch](README.de.md) · [Français](README.fr.md) · [Español](README.es.md) · [Português](README.pt-BR.md)

@@ -1,0 +1,84 @@
+WARNING: --no-deterministic: nothing is pinned; hashes may differ run to run
+WARNING: --rounds 2 is not a multiple of the 7 arms: the arm order is not balanced
+[base_r0] start, free RAM 57.1 GB
+[base_r0] up after 27 s
+  round 0 base: median 102.9 tok/s over 12 prompts
+[zen3_r0] start, free RAM 59.7 GB
+[zen3_r0] up after 24 s
+  round 0 zen3: median 117.0 tok/s over 12 prompts
+[pcie_r0] start, free RAM 59.3 GB
+[pcie_r0] up after 27 s
+  round 0 pcie: median 115.3 tok/s over 12 prompts
+[grfast_r0] start, free RAM 59.8 GB
+[grfast_r0] up after 27 s
+  round 0 grfast: median 116.2 tok/s over 12 prompts
+[sm86_r0] start, free RAM 59.8 GB
+[sm86_r0] up after 27 s
+  round 0 sm86: median 112.7 tok/s over 12 prompts
+[actahead_r0] start, free RAM 59.8 GB
+[actahead_r0] up after 27 s
+  round 0 actahead: median 112.0 tok/s over 12 prompts
+[cump_r0] start, free RAM 59.7 GB
+[cump_r0] up after 27 s
+  round 0 cump: median 113.7 tok/s over 12 prompts
+[zen3_r1] start, free RAM 59.8 GB
+[zen3_r1] up after 27 s
+  round 1 zen3: median 113.3 tok/s over 12 prompts
+[pcie_r1] start, free RAM 59.8 GB
+[pcie_r1] up after 27 s
+  round 1 pcie: median 117.1 tok/s over 12 prompts
+[grfast_r1] start, free RAM 59.8 GB
+[grfast_r1] up after 24 s
+  round 1 grfast: median 116.8 tok/s over 12 prompts
+[sm86_r1] start, free RAM 59.8 GB
+[sm86_r1] up after 27 s
+  round 1 sm86: median 112.3 tok/s over 12 prompts
+[actahead_r1] start, free RAM 59.8 GB
+[actahead_r1] up after 27 s
+  round 1 actahead: median 111.5 tok/s over 12 prompts
+[cump_r1] start, free RAM 59.8 GB
+[cump_r1] up after 27 s
+  round 1 cump: median 112.2 tok/s over 12 prompts
+[base_r1] start, free RAM 59.8 GB
+[base_r1] up after 27 s
+  round 1 base: median 113.3 tok/s over 12 prompts
+base: median 104.4 tok/s over all 12 prompts (not paired)
+zen3: median 115.8 tok/s over all 12 prompts (not paired)
+pcie: median 116.2 tok/s over all 12 prompts (not paired)
+grfast: median 116.5 tok/s over all 12 prompts (not paired)
+sm86: median 112.5 tok/s over all 12 prompts (not paired)
+actahead: median 112.1 tok/s over all 12 prompts (not paired)
+cump: median 112.2 tok/s over all 12 prompts (not paired)
+
+zen3 vs base: paired ratio median 1.011, prompts faster 1/1
+  WARNING: only 1/12 prompts are comparable: a ratio over a minority is not the arm's speed
+  arm not self-consistent (repeats differ, excluded): prompts [0, 1, 2, 3, 4, 5, 6, 7, 8, 10, 11]
+    prompt  9: 1.011
+
+pcie vs base: paired ratio median 1.019, prompts faster 1/1
+  WARNING: only 1/12 prompts are comparable: a ratio over a minority is not the arm's speed
+  text diverged (excluded): prompts [7] - the arms did different work there. Excluding them selects the prompts where the change did not alter the text, which can bias the ratio
+  arm not self-consistent (repeats differ, excluded): prompts [0, 1, 2, 3, 4, 5, 6, 8, 10, 11]
+    prompt  9: 1.019
+
+grfast vs base: paired ratio median 1.021, prompts faster 1/1
+  WARNING: only 1/12 prompts are comparable: a ratio over a minority is not the arm's speed
+  text diverged (excluded): prompts [7] - the arms did different work there. Excluding them selects the prompts where the change did not alter the text, which can bias the ratio
+  arm not self-consistent (repeats differ, excluded): prompts [0, 1, 2, 3, 4, 5, 6, 8, 10, 11]
+    prompt  9: 1.021
+
+sm86 vs base: paired ratio median 0.992, prompts faster 0/1
+  WARNING: only 1/12 prompts are comparable: a ratio over a minority is not the arm's speed
+  text diverged (excluded): prompts [7] - the arms did different work there. Excluding them selects the prompts where the change did not alter the text, which can bias the ratio
+  arm not self-consistent (repeats differ, excluded): prompts [0, 1, 2, 3, 4, 5, 6, 8, 10, 11]
+    prompt  9: 0.992
+
+actahead vs base: paired ratio median 0.971, prompts faster 0/1
+  WARNING: only 1/12 prompts are comparable: a ratio over a minority is not the arm's speed
+  arm not self-consistent (repeats differ, excluded): prompts [0, 1, 2, 3, 4, 5, 6, 7, 8, 10, 11]
+    prompt  9: 0.971
+
+cump vs base: paired ratio median 0.990, prompts faster 0/1
+  WARNING: only 1/12 prompts are comparable: a ratio over a minority is not the arm's speed
+  arm not self-consistent (repeats differ, excluded): prompts [0, 1, 2, 3, 4, 5, 6, 7, 8, 10, 11]
+    prompt  9: 0.990

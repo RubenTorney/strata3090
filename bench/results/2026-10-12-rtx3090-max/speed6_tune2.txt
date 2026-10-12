@@ -1,0 +1,56 @@
+WARNING: --no-deterministic: nothing is pinned; hashes may differ run to run
+WARNING: --rounds 1 is not a multiple of the 6 arms: the arm order is not balanced
+[ref_r0] start, free RAM 59.8 GB
+[ref_r0] up after 24 s
+  round 0 ref: median 120.3 tok/s over 12 prompts
+[sw160_r0] start, free RAM 59.8 GB
+[sw160_r0] up after 27 s
+  round 0 sw160: median 122.2 tok/s over 12 prompts
+[sw240_r0] start, free RAM 59.8 GB
+[sw240_r0] up after 27 s
+  round 0 sw240: median 121.8 tok/s over 12 prompts
+[sw400_r0] start, free RAM 59.8 GB
+[sw400_r0] up after 27 s
+  round 0 sw400: median 120.8 tok/s over 12 prompts
+[sw160pf45_r0] start, free RAM 59.8 GB
+[sw160pf45_r0] up after 27 s
+  round 0 sw160pf45: median 120.5 tok/s over 12 prompts
+[sw240pf45_r0] start, free RAM 59.8 GB
+[sw240pf45_r0] up after 27 s
+  round 0 sw240pf45: median 121.0 tok/s over 12 prompts
+ref: median 120.3 tok/s over all 12 prompts (not paired)
+sw160: median 122.2 tok/s over all 12 prompts (not paired)
+sw240: median 121.8 tok/s over all 12 prompts (not paired)
+sw400: median 120.8 tok/s over all 12 prompts (not paired)
+sw160pf45: median 120.5 tok/s over all 12 prompts (not paired)
+sw240pf45: median 121.0 tok/s over all 12 prompts (not paired)
+
+sw160 vs ref: paired ratio median 1.013, prompts faster 4/4
+  WARNING: only 4/12 prompts are comparable: a ratio over a minority is not the arm's speed
+  text diverged (excluded): prompts [1, 2, 4, 5, 6, 7, 8, 10] - the arms did different work there. Excluding them selects the prompts where the change did not alter the text, which can bias the ratio
+    prompt  0: 1.002
+    prompt  3: 1.015
+    prompt  9: 1.011
+    prompt 11: 1.034
+
+sw240 vs ref: paired ratio median 1.032, prompts faster 1/1
+  WARNING: only 1/12 prompts are comparable: a ratio over a minority is not the arm's speed
+  text diverged (excluded): prompts [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10] - the arms did different work there. Excluding them selects the prompts where the change did not alter the text, which can bias the ratio
+    prompt 11: 1.032
+
+sw400 vs ref: paired ratio median 1.000, prompts faster 1/2
+  WARNING: only 2/12 prompts are comparable: a ratio over a minority is not the arm's speed
+  text diverged (excluded): prompts [0, 1, 2, 3, 4, 5, 6, 7, 8, 11] - the arms did different work there. Excluding them selects the prompts where the change did not alter the text, which can bias the ratio
+    prompt  9: 0.996
+    prompt 10: 1.003
+
+sw160pf45 vs ref: paired ratio median 1.011, prompts faster 2/2
+  WARNING: only 2/12 prompts are comparable: a ratio over a minority is not the arm's speed
+  text diverged (excluded): prompts [0, 1, 2, 3, 4, 5, 6, 8, 10, 11] - the arms did different work there. Excluding them selects the prompts where the change did not alter the text, which can bias the ratio
+    prompt  7: 1.015
+    prompt  9: 1.007
+
+sw240pf45 vs ref: paired ratio median 0.999, prompts faster 0/1
+  WARNING: only 1/12 prompts are comparable: a ratio over a minority is not the arm's speed
+  text diverged (excluded): prompts [0, 1, 2, 3, 4, 5, 6, 7, 8, 10, 11] - the arms did different work there. Excluding them selects the prompts where the change did not alter the text, which can bias the ratio
+    prompt  9: 0.999

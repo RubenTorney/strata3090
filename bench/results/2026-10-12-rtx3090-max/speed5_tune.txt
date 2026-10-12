@@ -1,0 +1,162 @@
+WARNING: --no-deterministic: nothing is pinned; hashes may differ run to run
+WARNING: --rounds 1 is not a multiple of the 15 arms: the arm order is not balanced
+[ref_r0] start, free RAM 59.8 GB
+[ref_r0] up after 24 s
+  round 0 ref: median 120.8 tok/s over 12 prompts
+[pf25_r0] start, free RAM 59.8 GB
+[pf25_r0] up after 27 s
+  round 0 pf25: median 117.9 tok/s over 12 prompts
+[pf45_r0] start, free RAM 59.8 GB
+[pf45_r0] up after 24 s
+  round 0 pf45: median 121.3 tok/s over 12 prompts
+[sw120_r0] start, free RAM 59.8 GB
+[sw120_r0] up after 27 s
+  round 0 sw120: median 121.0 tok/s over 12 prompts
+[sw160_r0] start, free RAM 59.8 GB
+[sw160_r0] up after 27 s
+  round 0 sw160: median 122.7 tok/s over 12 prompts
+[dec95_r0] start, free RAM 59.8 GB
+[dec95_r0] up after 27 s
+  round 0 dec95: median 120.2 tok/s over 12 prompts
+[dec99_r0] start, free RAM 59.8 GB
+[dec99_r0] up after 27 s
+  round 0 dec99: median 113.8 tok/s over 12 prompts
+[minp60_r0] start, free RAM 59.8 GB
+[minp60_r0] up after 27 s
+  round 0 minp60: median 120.2 tok/s over 12 prompts
+[minp80_r0] start, free RAM 59.9 GB
+[minp80_r0] up after 27 s
+  round 0 minp80: median 117.8 tok/s over 12 prompts
+[s5c45_r0] start, free RAM 59.9 GB
+[s5c45_r0] up after 24 s
+  round 0 s5c45: median 112.6 tok/s over 12 prompts
+[s5c60_r0] start, free RAM 59.8 GB
+[s5c60_r0] up after 27 s
+  round 0 s5c60: median 114.7 tok/s over 12 prompts
+[s6c50_r0] start, free RAM 59.9 GB
+[s6c50_r0] up after 24 s
+  round 0 s6c50: median 114.8 tok/s over 12 prompts
+[pw5_r0] start, free RAM 59.9 GB
+[pw5_r0] up after 27 s
+  round 0 pw5: median 120.8 tok/s over 12 prompts
+[vr500_r0] start, free RAM 59.8 GB
+[vr500_r0] up after 27 s
+  round 0 vr500: median 119.6 tok/s over 12 prompts
+[lc0_r0] start, free RAM 59.8 GB
+[lc0_r0] up after 27 s
+  round 0 lc0: median 120.7 tok/s over 12 prompts
+ref: median 120.8 tok/s over all 12 prompts (not paired)
+pf25: median 117.9 tok/s over all 12 prompts (not paired)
+pf45: median 121.3 tok/s over all 12 prompts (not paired)
+sw120: median 121.0 tok/s over all 12 prompts (not paired)
+sw160: median 122.7 tok/s over all 12 prompts (not paired)
+dec95: median 120.2 tok/s over all 12 prompts (not paired)
+dec99: median 113.8 tok/s over all 12 prompts (not paired)
+minp60: median 120.2 tok/s over all 12 prompts (not paired)
+minp80: median 117.8 tok/s over all 12 prompts (not paired)
+s5c45: median 112.6 tok/s over all 12 prompts (not paired)
+s5c60: median 114.7 tok/s over all 12 prompts (not paired)
+s6c50: median 114.8 tok/s over all 12 prompts (not paired)
+pw5: median 120.8 tok/s over all 12 prompts (not paired)
+vr500: median 119.6 tok/s over all 12 prompts (not paired)
+lc0: median 120.7 tok/s over all 12 prompts (not paired)
+
+pf25 vs ref: paired ratio median 0.982, prompts faster 0/2
+  WARNING: only 2/12 prompts are comparable: a ratio over a minority is not the arm's speed
+  text diverged (excluded): prompts [0, 1, 2, 3, 4, 5, 6, 8, 10, 11] - the arms did different work there. Excluding them selects the prompts where the change did not alter the text, which can bias the ratio
+    prompt  7: 0.996
+    prompt  9: 0.968
+
+pf45 vs ref: paired ratio median 1.005, prompts faster 2/2
+  WARNING: only 2/12 prompts are comparable: a ratio over a minority is not the arm's speed
+  text diverged (excluded): prompts [0, 1, 2, 3, 4, 5, 6, 8, 10, 11] - the arms did different work there. Excluding them selects the prompts where the change did not alter the text, which can bias the ratio
+    prompt  7: 1.005
+    prompt  9: 1.004
+
+sw120 vs ref: paired ratio median 1.008, prompts faster 2/2
+  WARNING: only 2/12 prompts are comparable: a ratio over a minority is not the arm's speed
+  text diverged (excluded): prompts [0, 1, 2, 3, 4, 5, 6, 8, 10, 11] - the arms did different work there. Excluding them selects the prompts where the change did not alter the text, which can bias the ratio
+    prompt  7: 1.007
+    prompt  9: 1.009
+
+sw160 vs ref: paired ratio median 1.014, prompts faster 4/4
+  WARNING: only 4/12 prompts are comparable: a ratio over a minority is not the arm's speed
+  text diverged (excluded): prompts [1, 2, 4, 5, 6, 7, 8, 10] - the arms did different work there. Excluding them selects the prompts where the change did not alter the text, which can bias the ratio
+    prompt  0: 1.004
+    prompt  3: 1.015
+    prompt  9: 1.013
+    prompt 11: 1.032
+
+dec95 vs ref: paired ratio median 1.002, prompts faster 1/1
+  WARNING: only 1/12 prompts are comparable: a ratio over a minority is not the arm's speed
+  text diverged (excluded): prompts [0, 1, 2, 3, 4, 5, 6, 8, 9, 10, 11] - the arms did different work there. Excluding them selects the prompts where the change did not alter the text, which can bias the ratio
+    prompt  7: 1.002
+
+dec99 vs ref: paired ratio median 0.942, prompts faster 0/2
+  WARNING: only 2/12 prompts are comparable: a ratio over a minority is not the arm's speed
+  text diverged (excluded): prompts [0, 1, 2, 3, 4, 5, 6, 8, 10, 11] - the arms did different work there. Excluding them selects the prompts where the change did not alter the text, which can bias the ratio
+    prompt  7: 0.966
+    prompt  9: 0.917
+
+minp60 vs ref: paired ratio median 1.006, prompts faster 1/1
+  WARNING: only 1/12 prompts are comparable: a ratio over a minority is not the arm's speed
+  text diverged (excluded): prompts [0, 1, 2, 3, 4, 5, 6, 7, 8, 10, 11] - the arms did different work there. Excluding them selects the prompts where the change did not alter the text, which can bias the ratio
+    prompt  9: 1.006
+
+minp80 vs ref: paired ratio median 0.974, prompts faster 0/1
+  WARNING: only 1/12 prompts are comparable: a ratio over a minority is not the arm's speed
+  text diverged (excluded): prompts [0, 1, 2, 3, 4, 5, 6, 7, 8, 10, 11] - the arms did different work there. Excluding them selects the prompts where the change did not alter the text, which can bias the ratio
+    prompt  9: 0.974
+
+s5c45 vs ref: paired ratio median 0.972, prompts faster 0/2
+  WARNING: only 2/12 prompts are comparable: a ratio over a minority is not the arm's speed
+  text diverged (excluded): prompts [0, 1, 2, 3, 4, 5, 6, 8, 10, 11] - the arms did different work there. Excluding them selects the prompts where the change did not alter the text, which can bias the ratio
+    prompt  7: 0.972
+    prompt  9: 0.972
+
+s5c60 vs ref: paired ratio median 0.978, prompts faster 0/3
+  WARNING: only 3/12 prompts are comparable: a ratio over a minority is not the arm's speed
+  text diverged (excluded): prompts [0, 1, 2, 3, 4, 5, 6, 8, 10] - the arms did different work there. Excluding them selects the prompts where the change did not alter the text, which can bias the ratio
+    prompt  7: 0.985
+    prompt  9: 0.972
+    prompt 11: 0.978
+
+s6c50 vs ref: paired ratio median 0.977, prompts faster 0/2
+  WARNING: only 2/12 prompts are comparable: a ratio over a minority is not the arm's speed
+  text diverged (excluded): prompts [0, 1, 2, 3, 4, 5, 6, 8, 10, 11] - the arms did different work there. Excluding them selects the prompts where the change did not alter the text, which can bias the ratio
+    prompt  7: 0.972
+    prompt  9: 0.983
+
+pw5 vs ref: paired ratio median 1.000, prompts faster 2/12
+    prompt  0: 0.999
+    prompt  1: 1.000
+    prompt  2: 1.000
+    prompt  3: 1.000
+    prompt  4: 0.997
+    prompt  5: 0.998
+    prompt  6: 0.998
+    prompt  7: 0.998
+    prompt  8: 1.003
+    prompt  9: 0.999
+    prompt 10: 1.000
+    prompt 11: 1.001
+
+vr500 vs ref: paired ratio median 1.000, prompts faster 1/2
+  WARNING: only 2/12 prompts are comparable: a ratio over a minority is not the arm's speed
+  text diverged (excluded): prompts [1, 2, 3, 4, 5, 6, 7, 8, 10, 11] - the arms did different work there. Excluding them selects the prompts where the change did not alter the text, which can bias the ratio
+    prompt  0: 1.011
+    prompt  9: 0.989
+
+lc0 vs ref: paired ratio median 1.000, prompts faster 4/12
+    prompt  0: 0.999
+    prompt  1: 1.002
+    prompt  2: 1.002
+    prompt  3: 1.000
+    prompt  4: 0.998
+    prompt  5: 0.999
+    prompt  6: 1.000
+    prompt  7: 0.997
+    prompt  8: 1.002
+    prompt  9: 1.001
+    prompt 10: 0.999
+    prompt 11: 1.000

@@ -1,0 +1,30 @@
+{"prompt": "Écris un script Bash qui sauvegarde un dossier en archive tar.gz datée et supprime les sauvegardes de plus de 30 jours."}
+{"prompt": "Explique la différence entre un mutex et un sémaphore, avec un exemple en C++."}
+{"prompt": "Écris une API REST minimale en Python avec FastAPI pour gérer une liste de tâches (CRUD), avec validation Pydantic."}
+{"prompt": "Comment fonctionne le ramasse-miettes de Go ? Explique en français pour un développeur Java."}
+{"prompt": "Refactorise ce code : def f(l):\n  r=[]\n  for i in range(len(l)):\n    if l[i]%2==0: r.append(l[i]*2)\n  return r\nExplique tes choix."}
+{"prompt": "Rédige un Dockerfile multi-étapes pour une application Node.js TypeScript, avec une image finale légère."}
+{"prompt": "Explique le théorème CAP et donne un exemple de base de données pour chaque compromis."}
+{"prompt": "Écris un composant React avec hooks qui affiche une liste paginée chargée depuis une API, en gérant le chargement et les erreurs."}
+{"prompt": "Quelle est la différence entre git merge et git rebase ? Donne les commandes pour chaque cas d'usage."}
+{"prompt": "Écris une requête SQL avec une fonction de fenêtrage qui calcule la moyenne mobile sur 7 jours des ventes par magasin."}
+{"prompt": "Explique comment fonctionne l'attention dans un transformeur, avec les formules principales."}
+{"prompt": "Écris un test unitaire pytest pour une fonction qui parse une date ISO 8601, en couvrant les cas limites."}
+{"prompt": "Propose une architecture pour un système de file d'attente de tâches asynchrones avec reprise sur erreur."}
+{"prompt": "Écris en Rust une fonction qui lit un fichier CSV et renvoie la somme d'une colonne, avec gestion des erreurs."}
+{"prompt": "Rédige un compte rendu de réunion technique à partir de ces points : migration PostgreSQL 16, retard du lot 2, recrutement d'un DevOps."}
+{"prompt": "Explique ce qu'est une injection SQL et comment s'en protéger en PHP avec PDO."}
+{"prompt": "Écris un fichier docker-compose pour une application web avec Nginx, une API Python et PostgreSQL."}
+{"prompt": "Explique la complexité amortie avec l'exemple d'un tableau dynamique."}
+{"prompt": "Écris une fonction TypeScript générique qui regroupe un tableau d'objets par clé, avec les types corrects."}
+{"prompt": "Rédige une proposition commerciale courte pour une mission de conseil en architecture logicielle de 20 jours."}
+{"prompt": "Comment diagnostiquer une fuite mémoire dans une application Python en production ? Donne une méthode pas à pas."}
+{"prompt": "Écris un workflow GitHub Actions qui lance les tests, construit une image Docker et la pousse sur un registre."}
+{"prompt": "Explique le fonctionnement de TLS 1.3 lors de l'établissement d'une connexion."}
+{"prompt": "Écris en C une liste chaînée avec insertion, suppression et libération de la mémoire."}
+{"prompt": "Quels sont les avantages et inconvénients des microservices par rapport à un monolithe modulaire ?"}
+{"prompt": "Écris un script Python qui parcourt un dossier, calcule le SHA-256 de chaque fichier et détecte les doublons."}
+{"prompt": "Explique comment configurer un reverse proxy Nginx avec HTTPS et redirection HTTP vers HTTPS."}
+{"prompt": "Rédige un courriel à un client pour expliquer une panne de service, ses causes et les mesures correctives."}
+{"prompt": "Écris une classe Java immuable représentant une somme d'argent avec devise, avec equals et hashCode."}
+{"prompt": "Explique la différence entre processus et thread sous Linux et comment le noyau les ordonnance."}

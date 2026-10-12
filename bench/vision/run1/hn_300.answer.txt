@@ -1,0 +1,460 @@
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hacker News</title>
+<style>
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
+  body {
+    background-color: #f6f6ef;
+    font-family: Verdana, Geneva, sans-serif;
+    font-size: 10pt;
+    color: #000;
+  }
+
+  .page-wrapper {
+    max-width: 85%;
+    margin: 0 auto;
+    background-color: #f6f6ef;
+  }
+
+  .top-bar {
+    background-color: #ff6600;
+    padding: 4px 8px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 24px;
+  }
+
+  .top-bar-left {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .logo {
+    display: inline-block;
+    width: 18px;
+    height: 18px;
+    background-color: #fff;
+    border: 1px solid #000;
+    text-align: center;
+    line-height: 18px;
+    font-weight: bold;
+    font-size: 12px;
+    color: #000;
+    margin-right: 4px;
+  }
+
+  .top-bar a {
+    color: #000;
+    text-decoration: none;
+    font-size: 10pt;
+    font-weight: bold;
+  }
+
+  .top-bar .site-name {
+    font-weight: bold;
+    font-size: 10pt;
+    color: #000;
+  }
+
+  .top-bar .nav-links {
+    font-size: 10pt;
+    color: #000;
+  }
+
+  .top-bar .nav-links a {
+    color: #000;
+    text-decoration: none;
+  }
+
+  .top-bar .nav-links .sep {
+    color: #000;
+  }
+
+  .top-bar-right {
+    font-size: 10pt;
+  }
+
+  .top-bar-right a {
+    color: #000;
+    text-decoration: none;
+  }
+
+  .content {
+    padding: 8px 0 0 0;
+  }
+
+  .story {
+    display: flex;
+    align-items: baseline;
+    padding: 2px 0;
+    line-height: 1.4;
+  }
+
+  .story-rank {
+    color: #828282;
+    font-size: 10pt;
+    min-width: 28px;
+    text-align: right;
+    padding-right: 4px;
+    flex-shrink: 0;
+  }
+
+  .story-content {
+    flex: 1;
+  }
+
+  .story-title {
+    font-size: 10pt;
+    color: #000;
+    text-decoration: none;
+    line-height: 1.3;
+  }
+
+  .story-title:hover {
+    text-decoration: underline;
+  }
+
+  .story-domain {
+    font-size: 8pt;
+    color: #828282;
+    margin-left: 2px;
+  }
+
+  .story-meta {
+    font-size: 8pt;
+    color: #828282;
+    padding-left: 28px;
+    margin-bottom: 4px;
+    line-height: 1.4;
+  }
+
+  .story-meta a {
+    color: #828282;
+    text-decoration: none;
+  }
+
+  .story-meta a:hover {
+    text-decoration: underline;
+  }
+
+  .more-link {
+    padding-left: 28px;
+    padding-top: 10px;
+    font-size: 10pt;
+  }
+
+  .more-link a {
+    color: #000;
+    text-decoration: none;
+    font-weight: bold;
+  }
+
+  .footer {
+    margin-top: 20px;
+    border-top: 1px solid #ff6600;
+    padding: 10px 0;
+    text-align: center;
+    font-size: 8pt;
+    color: #828282;
+  }
+
+  .footer a {
+    color: #828282;
+    text-decoration: none;
+  }
+</style>
+</head>
+<body>
+<div class="page-wrapper">
+  <div class="top-bar">
+    <div class="top-bar-left">
+      <span class="logo">Y</span>
+      <span class="site-name">Hacker News</span>
+      <span class="nav-links">
+        &nbsp;new&nbsp;|&nbsp;<a href="#">past</a>&nbsp;|&nbsp;<a href="#">comments</a>&nbsp;|&nbsp;<a href="#">ask</a>&nbsp;|&nbsp;<a href="#">show</a>&nbsp;|&nbsp;<a href="#">jobs</a>&nbsp;|&nbsp;<a href="#">submit</a>
+      </span>
+    </div>
+    <div class="top-bar-right">
+      <a href="#">login</a>
+    </div>
+  </div>
+
+  <div class="content">
+
+    <div class="story">
+      <span class="story-rank">1.</span>
+      <div class="story-content">
+        <a class="story-title" href="#">Total Annihilation, rebuilt for modern computers</a>
+        <span class="story-domain">(moddingwiki.se)</span>
+      </div>
+    </div>
+    <div class="story-meta">
+      347 points by <a href="#">dmarcos</a> 7 hours ago&nbsp;|&nbsp;hide&nbsp;|&nbsp;175&nbsp;comments
+    </div>
+
+    <div class="story">
+      <span class="story-rank">2.</span>
+      <div class="story-content">
+        <a class="story-title" href="#">Cartographers of North Korea</a>
+        <span class="story-domain">(washingtonpost.com)</span>
+      </div>
+    </div>
+    <div class="story-meta">
+      120 points by <a href="#">viewner</a> 3 hours ago&nbsp;|&nbsp;hide&nbsp;|&nbsp;13&nbsp;comments
+    </div>
+
+    <div class="story">
+      <span class="story-rank">3.</span>
+      <div class="story-content">
+        <a class="story-title" href="#">The gap in shared understanding of LLM capability is widening</a>
+        <span class="story-domain">(twitter.com/karpathy)</span>
+      </div>
+    </div>
+    <div class="story-meta">
+      116 points by <a href="#">alperenayte</a> 2 hours ago&nbsp;|&nbsp;hide&nbsp;|&nbsp;145&nbsp;comments
+    </div>
+
+    <div class="story">
+      <span class="story-rank">4.</span>
+      <div class="story-content">
+        <a class="story-title" href="#">So, You'd Like To Sell Your Print Issues Of The Onion?</a>
+        <span class="story-domain">(fusion.com)</span>
+      </div>
+    </div>
+    <div class="story-meta">
+      245 points by <a href="#">mattmccarthy</a> 10 hours ago&nbsp;|&nbsp;hide&nbsp;|&nbsp;144&nbsp;comments
+    </div>
+
+    <div class="story">
+      <span class="story-rank">5.</span>
+      <div class="story-content">
+        <a class="story-title" href="#">Chapter 1 of Ways of Seeing by John Berger</a>
+        <span class="story-domain">(wayof-seeing.com)</span>
+      </div>
+    </div>
+    <div class="story-meta">
+      81 points by <a href="#">mattferr</a> 6 hours ago&nbsp;|&nbsp;hide&nbsp;|&nbsp;14&nbsp;comments
+    </div>
+
+    <div class="story">
+      <span class="story-rank">6.</span>
+      <div class="story-content">
+        <a class="story-title" href="#">How to Build Wealth as a Career Person</a>
+        <span class="story-domain">(ashendesign.co)</span>
+      </div>
+    </div>
+    <div class="story-meta">
+      129 points by <a href="#">mattferr</a> 8 hours ago&nbsp;|&nbsp;hide&nbsp;|&nbsp;113&nbsp;comments
+    </div>
+
+    <div class="story">
+      <span class="story-rank">7.</span>
+      <div class="story-content">
+        <a class="story-title" href="#">Terence Tao: Math 2.0 (pdf)</a>
+        <span class="story-domain">(terrytao.wordpress.com)</span>
+      </div>
+    </div>
+    <div class="story-meta">
+      246 points by <a href="#">mattferr</a> 9 hours ago&nbsp;|&nbsp;hide&nbsp;|&nbsp;140&nbsp;comments
+    </div>
+
+    <div class="story">
+      <span class="story-rank">8.</span>
+      <div class="story-content">
+        <a class="story-title" href="#">NYC's 'Click to Cancel' rule is now in effect</a>
+        <span class="story-domain">(nyc.gov)</span>
+      </div>
+    </div>
+    <div class="story-meta">
+      267 points by <a href="#">mattferr</a> 4 hours ago&nbsp;|&nbsp;hide&nbsp;|&nbsp;197&nbsp;comments
+    </div>
+
+    <div class="story">
+      <span class="story-rank">9.</span>
+      <div class="story-content">
+        <a class="story-title" href="#">A Remote Employee Refused 160 Webcam Photos a Day. Her Employer Fired Her</a>
+        <span class="story-domain">(inc.com)</span>
+      </div>
+    </div>
+    <div class="story-meta">
+      79 points by <a href="#">mattferr</a> 1 hour ago&nbsp;|&nbsp;hide&nbsp;|&nbsp;69&nbsp;comments
+    </div>
+
+    <div class="story">
+      <span class="story-rank">10.</span>
+      <div class="story-content">
+        <a class="story-title" href="#">RICO (1970)</a>
+        <span class="story-domain">(en.wikipedia.org)</span>
+      </div>
+    </div>
+    <div class="story-meta">
+      103 points by <a href="#">mattferr</a> 12 hours ago&nbsp;|&nbsp;hide&nbsp;|&nbsp;277&nbsp;comments
+    </div>
+
+    <div class="story">
+      <span class="story-rank">11.</span>
+      <div class="story-content">
+        <a class="story-title" href="#">Passkeys are a trap. Do not use them</a>
+        <span class="story-domain">(nonfunctional.substack.com)</span>
+      </div>
+    </div>
+    <div class="story-meta">
+      77 points by <a href="#">mattferr</a> 10 hours ago&nbsp;|&nbsp;hide&nbsp;|&nbsp;143&nbsp;comments
+    </div>
+
+    <div class="story">
+      <span class="story-rank">12.</span>
+      <div class="story-content">
+        <a class="story-title" href="#">I guess I'm using WebP now?</a>
+        <span class="story-domain">(undercreng.com)</span>
+      </div>
+    </div>
+    <div class="story-meta">
+      72 points by <a href="#">mattferr</a> 10 hours ago&nbsp;|&nbsp;hide&nbsp;|&nbsp;15&nbsp;comments
+    </div>
+
+    <div class="story">
+      <span class="story-rank">13.</span>
+      <div class="story-content">
+        <a class="story-title" href="#">The title in your PATH may now be your HOME</a>
+        <span class="story-domain">(disconnected365.pl)</span>
+      </div>
+    </div>
+    <div class="story-meta">
+      101 points by <a href="#">mattferr</a> 10 hours ago&nbsp;|&nbsp;hide&nbsp;|&nbsp;137&nbsp;comments
+    </div>
+
+    <div class="story">
+      <span class="story-rank">14.</span>
+      <div class="story-content">
+        <a class="story-title" href="#">LineageOS 24.0</a>
+        <span class="story-domain">(lineageos.org)</span>
+      </div>
+    </div>
+    <div class="story-meta">
+      269 points by <a href="#">mattferr</a> 12 hours ago&nbsp;|&nbsp;hide&nbsp;|&nbsp;163&nbsp;comments
+    </div>
+
+    <div class="story">
+      <span class="story-rank">15.</span>
+      <div class="story-content">
+        <a class="story-title" href="#">500B tokens later: Letting AI agents decompile a first-person shooter</a>
+        <span class="story-domain">(moez6502.org)</span>
+      </div>
+    </div>
+    <div class="story-meta">
+      116 points by <a href="#">mattferr</a> 12 hours ago&nbsp;|&nbsp;hide&nbsp;|&nbsp;53&nbsp;comments
+    </div>
+
+    <div class="story">
+      <span class="story-rank">16.</span>
+      <div class="story-content">
+        <a class="story-title" href="#">Another Python SQLite Wrapper</a>
+        <span class="story-domain">(github.com/coleifer)</span>
+      </div>
+    </div>
+    <div class="story-meta">
+      97 points by <a href="#">mattferr</a> 5 hours ago&nbsp;|&nbsp;hide&nbsp;|&nbsp;13&nbsp;comments
+    </div>
+
+    <div class="story">
+      <span class="story-rank">17.</span>
+      <div class="story-content">
+        <a class="story-title" href="#">Safe SIMD in Rust, even on the inside</a>
+        <span class="story-domain">(github.com)</span>
+      </div>
+    </div>
+    <div class="story-meta">
+      15 points by <a href="#">mattferr</a> 4 hours ago&nbsp;|&nbsp;hide&nbsp;|&nbsp;1&nbsp;comment
+    </div>
+
+    <div class="story">
+      <span class="story-rank">18.</span>
+      <div class="story-content">
+        <a class="story-title" href="#">The Unreasonable Effectiveness of Vex in NiOS</a>
+        <span class="story-domain">(niios.dev)</span>
+      </div>
+    </div>
+    <div class="story-meta">
+      49 points by <a href="#">mattferr</a> 11 hours ago&nbsp;|&nbsp;hide&nbsp;|&nbsp;1&nbsp;comment
+    </div>
+
+    <div class="story">
+      <span class="story-rank">19.</span>
+      <div class="story-content">
+        <a class="story-title" href="#">FlowC: Calculus on your TI-84 Plus CE</a>
+        <span class="story-domain">(github.com)</span>
+      </div>
+    </div>
+    <div class="story-meta">
+      14 points by <a href="#">mattferr</a> 5 hours ago&nbsp;|&nbsp;hide&nbsp;|&nbsp;0&nbsp;comments
+    </div>
+
+    <div class="story">
+      <span class="story-rank">20.</span>
+      <div class="story-content">
+        <a class="story-title" href="#">Show HN: BetterWrp – Free, open-source dictation for Mac</a>
+        <span class="story-domain">(betterwrp.com)</span>
+      </div>
+    </div>
+    <div class="story-meta">
+      14 points by <a href="#">mattferr</a> 10 hours ago&nbsp;|&nbsp;hide&nbsp;|&nbsp;66&nbsp;comments
+    </div>
+
+    <div class="story">
+      <span class="story-rank">21.</span>
+      <div class="story-content">
+        <a class="story-title" href="#">SQLAlchemy 2.1.0 Released</a>
+        <span class="story-domain">(sqlalchemy.org)</span>
+      </div>
+    </div>
+    <div class="story-meta">
+      7 points by <a href="#">mattferr</a> 1 hour ago&nbsp;|&nbsp;hide&nbsp;|&nbsp;1&nbsp;comment
+    </div>
+
+    <div class="story">
+      <span class="story-rank">22.</span>
+      <div class="story-content">
+        <a class="story-title" href="#">How I reverse engineered a commercial spatial audio effect</a>
+        <span class="story-domain">(spatx.com)</span>
+      </div>
+    </div>
+    <div class="story-meta">
+      81 points by <a href="#">mattferr</a> 7 hours ago&nbsp;|&nbsp;hide&nbsp;|&nbsp;23&nbsp;comments
+    </div>
+
+    <div class="story">
+      <span class="story-rank">23.</span>
+      <div class="story-content">
+        <a class="story-title" href="#">Valen's Memory Safety: A New Kind of Borrow Checking</a>
+        <span class="story-domain">(veridiceng.dev)</span>
+      </div>
+    </div>
+    <div class="story-meta">
+      126 points by <a href="#">mattferr</a> 10 hours ago&nbsp;|&nbsp;hide&nbsp;|&nbsp;77&nbsp;comments
+    </div>
+
+    <div class="more-link">
+      <a href="#">More</a>
+    </div>
+
+  </div>
+
+  <div class="footer">
+    <a href="#">Guidelines</a>&nbsp;|&nbsp;<a href="#">Security</a>&nbsp;|&nbsp;<a href="#">Legal</a>&nbsp;|&nbsp;<a href="#">Apply to YC</a>&nbsp;|&nbsp;<a href="#">Contact</a>
+  </div>
+</div>
+</body>
+</html>
+```

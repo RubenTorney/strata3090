@@ -1,0 +1,79 @@
+WARNING: --rounds 2 is not a multiple of the 6 arms: the arm order is not balanced
+[base_r0] start, free RAM 59.8 GB
+[base_r0] up after 27 s
+  round 0 base: median 73.5 tok/s over 12 prompts
+[pcie_r0] start, free RAM 59.8 GB
+[pcie_r0] up after 27 s
+  round 0 pcie: median 73.8 tok/s over 12 prompts
+[grfast_r0] start, free RAM 59.8 GB
+[grfast_r0] up after 27 s
+  round 0 grfast: median 76.0 tok/s over 12 prompts
+[sm86_r0] start, free RAM 59.8 GB
+[sm86_r0] up after 27 s
+  round 0 sm86: median 74.7 tok/s over 12 prompts
+[actahead_r0] start, free RAM 59.8 GB
+[actahead_r0] up after 27 s
+  round 0 actahead: median 74.6 tok/s over 12 prompts
+[pcie_grfast_r0] start, free RAM 59.8 GB
+[pcie_grfast_r0] up after 27 s
+  round 0 pcie_grfast: median 76.0 tok/s over 12 prompts
+[pcie_r1] start, free RAM 59.8 GB
+[pcie_r1] up after 27 s
+  round 1 pcie: median 75.0 tok/s over 12 prompts
+[grfast_r1] start, free RAM 59.8 GB
+[grfast_r1] up after 24 s
+  round 1 grfast: median 75.1 tok/s over 12 prompts
+[sm86_r1] start, free RAM 59.8 GB
+[sm86_r1] up after 27 s
+  round 1 sm86: median 73.6 tok/s over 12 prompts
+[actahead_r1] start, free RAM 59.8 GB
+[actahead_r1] up after 27 s
+  round 1 actahead: median 73.7 tok/s over 12 prompts
+[pcie_grfast_r1] start, free RAM 59.8 GB
+[pcie_grfast_r1] up after 27 s
+  round 1 pcie_grfast: median 75.5 tok/s over 12 prompts
+[base_r1] start, free RAM 59.8 GB
+[base_r1] up after 27 s
+  round 1 base: median 74.2 tok/s over 12 prompts
+base: median 73.8 tok/s over all 12 prompts (not paired)
+pcie: median 74.4 tok/s over all 12 prompts (not paired)
+grfast: median 75.5 tok/s over all 12 prompts (not paired)
+sm86: median 74.1 tok/s over all 12 prompts (not paired)
+actahead: median 74.1 tok/s over all 12 prompts (not paired)
+pcie_grfast: median 75.8 tok/s over all 12 prompts (not paired)
+
+pcie vs base: paired ratio median 1.009, prompts faster 4/4
+  WARNING: only 4/12 prompts are comparable: a ratio over a minority is not the arm's speed
+  arm not self-consistent (repeats differ, excluded): prompts [0, 1, 2, 3, 4, 7, 9, 10]
+    prompt  5: 1.007
+    prompt  6: 1.012
+    prompt  8: 1.008
+    prompt 11: 1.010
+
+grfast vs base: paired ratio median 1.015, prompts faster 3/3
+  WARNING: only 3/12 prompts are comparable: a ratio over a minority is not the arm's speed
+  arm not self-consistent (repeats differ, excluded): prompts [0, 1, 2, 3, 4, 6, 7, 9, 10]
+    prompt  5: 1.015
+    prompt  8: 1.010
+    prompt 11: 1.022
+
+sm86 vs base: paired ratio median 0.997, prompts faster 0/3
+  WARNING: only 3/12 prompts are comparable: a ratio over a minority is not the arm's speed
+  arm not self-consistent (repeats differ, excluded): prompts [0, 1, 2, 3, 4, 6, 7, 9, 10]
+    prompt  5: 0.997
+    prompt  8: 0.990
+    prompt 11: 1.000
+
+actahead vs base: paired ratio median 0.995, prompts faster 0/3
+  WARNING: only 3/12 prompts are comparable: a ratio over a minority is not the arm's speed
+  arm not self-consistent (repeats differ, excluded): prompts [0, 1, 2, 3, 4, 6, 7, 9, 10]
+    prompt  5: 0.995
+    prompt  8: 0.990
+    prompt 11: 0.997
+
+pcie_grfast vs base: paired ratio median 1.015, prompts faster 3/3
+  WARNING: only 3/12 prompts are comparable: a ratio over a minority is not the arm's speed
+  arm not self-consistent (repeats differ, excluded): prompts [0, 1, 2, 3, 4, 6, 7, 9, 10]
+    prompt  5: 1.015
+    prompt  8: 1.010
+    prompt 11: 1.026

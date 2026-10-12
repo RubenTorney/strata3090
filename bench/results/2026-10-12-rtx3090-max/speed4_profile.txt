@@ -1,0 +1,20 @@
+WARNING: --no-deterministic: nothing is pinned; hashes may differ run to run
+[combo_zen3_r0] start, free RAM 59.8 GB
+[combo_zen3_r0] up after 27 s
+  round 0 combo_zen3: median 121.0 tok/s over 12 prompts
+[profile_r0] start, free RAM 59.8 GB
+[profile_r0] up after 24 s
+  round 0 profile: median 120.8 tok/s over 12 prompts
+[profile_r1] start, free RAM 59.8 GB
+[profile_r1] up after 27 s
+  round 1 profile: median 120.6 tok/s over 12 prompts
+[combo_zen3_r1] start, free RAM 59.8 GB
+[combo_zen3_r1] up after 27 s
+  round 1 combo_zen3: median 120.6 tok/s over 12 prompts
+combo_zen3: median 120.8 tok/s over all 12 prompts (not paired)
+profile: median 120.7 tok/s over all 12 prompts (not paired)
+
+profile vs combo_zen3: paired ratio median 0.997, prompts faster 0/1
+  WARNING: only 1/12 prompts are comparable: a ratio over a minority is not the arm's speed
+  text diverged (excluded): prompts [0, 1, 2, 3, 4, 5, 6, 7, 8, 10, 11] - the arms did different work there. Excluding them selects the prompts where the change did not alter the text, which can bias the ratio
+    prompt  9: 0.997

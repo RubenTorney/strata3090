@@ -1,3 +1,17 @@
   round 0 ref: median 93.0 tok/s over 1 prompts
   round 0 k8v4: median 91.6 tok/s over 1 prompts
   round 0 q4: median 89.4 tok/s over 1 prompts
+  round 0 kvres: median 94.4 tok/s over 1 prompts
+  round 0 pf50: median 93.6 tok/s over 1 prompts
+  round 0 pf20: median 91.7 tok/s over 1 prompts
+  round 0 sw80: median 93.0 tok/s over 1 prompts
+  round 0 sw320: median 90.6 tok/s over 1 prompts
+  round 0 ref2: median 91.7 tok/s over 1 prompts
+  round 0 kvres_b: median 94.6 tok/s over 1 prompts
+  round 0 ref3: median 91.7 tok/s over 1 prompts
+  round 0 kvres_c: median 94.4 tok/s over 1 prompts
+  round 0 kvres20: median 96.2 tok/s over 1 prompts
+  round 0 kvres32: median 93.7 tok/s over 1 prompts
+  round 0 ref4: median 91.7 tok/s over 1 prompts
+  round 0 kvres20_b: median 92.5 tok/s over 1 prompts
+  round 0 kvres20_c: median 95.1 tok/s over 1 prompts

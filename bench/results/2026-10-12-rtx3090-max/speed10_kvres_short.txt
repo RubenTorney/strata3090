@@ -1,0 +1,10 @@
+WARNING: --rounds 1 is not a multiple of the 2 arms: the arm order is not balanced
+  round 0 ref: median 121.3 tok/s over 12 prompts
+  round 0 kvres: median 117.3 tok/s over 12 prompts
+WARNING: --rounds 1 is not a multiple of the 3 arms: the arm order is not balanced
+  round 0 ref_b: median 121.3 tok/s over 12 prompts
+  round 0 kvres20: median 119.2 tok/s over 12 prompts
+  round 0 kvres32: median 118.1 tok/s over 12 prompts
+WARNING: --rounds 1 is not a multiple of the 2 arms: the arm order is not balanced
+  round 0 kvres20_b: median 120.6 tok/s over 12 prompts
+  round 0 ref_c: median 121.0 tok/s over 12 prompts

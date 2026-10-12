@@ -1,0 +1,4 @@
+  det_adapt engine 0: 3b586f d763ce 3d2249 57ec4b f46d3b f125e1 03f541 1249a7 4a4201 7e316c 2cc9df ea32e0
+  det_adapt engine 1: 3b586f d763ce 3d2249 57ec4b f46d3b f125e1 03f541 1249a7 4a4201 7e316c 2cc9df ea32e0
+  det_adapt engine 2: 3b586f d763ce 3d2249 57ec4b f46d3b f125e1 03f541 1249a7 4a4201 7e316c 2cc9df ea32e0
+det_adapt: self-consistent over 3 engines (12/12 prompts)

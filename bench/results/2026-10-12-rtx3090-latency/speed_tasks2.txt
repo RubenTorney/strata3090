@@ -1,0 +1,25 @@
+WARNING: --no-deterministic: nothing is pinned; hashes may differ run to run
+WARNING: --rounds 1 is not a multiple of the 2 arms: the arm order is not balanced
+[pt36_r0] start, free RAM 59.7 GB
+[pt36_r0] up after 27 s
+  round 0 pt36: median 122.8 tok/s over 12 prompts
+[ref_r0] start, free RAM 59.8 GB
+[ref_r0] up after 27 s
+  round 0 ref: median 122.8 tok/s over 12 prompts
+pt36: median 122.8 tok/s over all 12 prompts (not paired)
+ref: median 122.8 tok/s over all 12 prompts (not paired)
+
+ref vs pt36: paired ratio median 0.999, prompts faster 4/12
+    prompt  0: 0.999
+    prompt  1: 0.997
+    prompt  2: 1.001
+    prompt  3: 0.999
+    prompt  4: 0.999
+    prompt  5: 0.998
+    prompt  6: 1.001
+    prompt  7: 0.999
+    prompt  8: 0.999
+    prompt  9: 1.003
+    prompt 10: 0.999
+    prompt 11: 1.001
+DRIVER EXIT 0

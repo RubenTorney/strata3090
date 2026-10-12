@@ -465,6 +465,9 @@ struct ExpertDispatch {
     int64_t tail_skipped = 0;
     int64_t tail_experts = 0;
     double ms_plan = 0, ms_actq = 0, ms_jobs = 0, ms_run = 0;   ///< verify-window dispatch sections
+    /// strata3090 measurement: `ms_plan` split - the source's begin_layer, the plan's publish (the GPU's flag A) and the
+    /// PCIe share's fetch submit (cudaMemcpyAsync + host function); the rest of ms_plan is the plan itself
+    double ms_plan_begin = 0, ms_plan_publish = 0, ms_plan_fetch = 0;
     /// Plan v0.3 P6: decayed routing counts per (layer, expert) during decode (sized by the caller; empty = off),
     /// which the driver uses to swap the most-routed missing experts into the VRAM tier between rounds.
     std::vector<float> usage;

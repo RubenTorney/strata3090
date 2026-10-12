@@ -11429,11 +11429,13 @@ int main(int argc, char** argv) {
             struct DecSnap {
                 double wait, pool, host, plan, actq, jobs, run;
                 int64_t misses, entries, hits, pcie;
+                double plan_begin, plan_publish, plan_fetch, mgu, mq, mdown;   // strata3090: the finer host chain
             };
             auto dec_snap = [&]() {
                 return DecSnap{ver.ms_wait, ver.ms_pool, ver.ms_host, drive.d.ms_plan, drive.d.ms_actq, drive.d.ms_jobs,
                                drive.d.ms_run, drive.d.multi_misses, drive.d.multi_entries, drive.d.cache_hits,
-                               drive.d.pcie_experts};
+                               drive.d.pcie_experts, drive.d.ms_plan_begin, drive.d.ms_plan_publish, drive.d.ms_plan_fetch,
+                               pool.ms_multi_gu, pool.ms_multi_q, pool.ms_multi_down};
             };
             const DecSnap ds0 = dec_snap();
             double dt_run = 0, dt_commit = 0, dt_draft = 0;
@@ -12340,6 +12342,18 @@ int main(int argc, char** argv) {
                              (d1.host - ds0.host) / w, dt_commit / w, dt_draft / w, (d1.misses - ds0.misses) / (w * L),
                              (d1.entries - ds0.entries) / (w * L), (d1.hits - ds0.hits) / (w * L), (d1.pcie - ds0.pcie) / (w * L),
                              dt_adapt_wait / w, dt_adapt_join / w, (double) ((ajob ? a_swapped : adapt_nswaps) - dt_sw0) / w);
+                {   // strata3090 measurement: the host's per-layer chain in finer pieces (per window; STRATA_POOL_STAMPS=1 adds the pool's)
+                    const double lw = (double) dec_windows;
+                    std::fprintf(stderr, "strata decode host chain (ms/window): plan = begin_layer %.3f + plan %.3f + publish %.3f + fetch %.3f; "
+                                         "pool run = gate/up phase %.3f + host quant %.3f + down phase %.3f (pool-reported, all layers)\n",
+                                 (drive.d.ms_plan_begin - ds0.plan_begin) / lw,
+                                 ((drive.d.ms_plan - ds0.plan) - (drive.d.ms_plan_begin - ds0.plan_begin) -
+                                  (drive.d.ms_plan_publish - ds0.plan_publish) - (drive.d.ms_plan_fetch - ds0.plan_fetch)) / lw,
+                                 (drive.d.ms_plan_publish - ds0.plan_publish) / lw, (drive.d.ms_plan_fetch - ds0.plan_fetch) / lw,
+                                 (pool.ms_multi_gu - ds0.mgu) / lw, (pool.ms_multi_q - ds0.mq) / lw, (pool.ms_multi_down - ds0.mdown) / lw);
+                    const std::string ps = pool.stamps_report();
+                    if (!ps.empty()) std::fprintf(stderr, "strata decode pool stamps:%s\n", ps.c_str());
+                }
                 if (aov)
                     std::fprintf(stderr, "strata decode adapt overlap: %lld windows took swaps still landing, a layer waited %.2f ms in all so far\n",
                                  (long long) aov_flips, ver.ms_gate);

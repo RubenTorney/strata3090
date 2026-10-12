@@ -450,6 +450,13 @@ ExpertPool::ExpertPool(int n_workers, bool pin, bool host_works, PoolAffinity af
     scratch_.resize((size_t) n_);
     wstate_.reset(new std::atomic<int32_t>[(size_t) n_]);
     for (int i = 0; i < n_; ++i) wstate_[(size_t) i].store(kParked);
+    if (const char* e = std::getenv("STRATA_POOL_STAMPS"); e != nullptr && std::atoi(e) != 0) {   // measurement only
+        stamps_ = true;
+        st_first_.reset(new std::atomic<int64_t>[(size_t) n_ + 1]);
+        st_last_.reset(new std::atomic<int64_t>[(size_t) n_ + 1]);
+        st_tasks_.reset(new std::atomic<int32_t>[(size_t) n_ + 1]);
+        for (int i = 0; i <= n_; ++i) { st_first_[(size_t) i].store(0); st_last_[(size_t) i].store(0); st_tasks_[(size_t) i].store(0); }
+    }
     hstate_ms_.store(now_ms());
     g_diag_pool.store(this);
     strata::core::diag_pool_fn().store(&diag_active_pool);
@@ -615,6 +622,11 @@ void ExpertPool::drain(int id, ExpertScratch& scratch, uint32_t epoch) {
         const uint32_t i = (uint32_t) ci;
         if (id >= 0) wstate_[(size_t) id].store(ci, std::memory_order_relaxed);
         else { hstate_.store(ci, std::memory_order_relaxed); hstate_ms_.store(now_ms(), std::memory_order_relaxed); }
+        const size_t sid = id >= 0 ? (size_t) id : (size_t) n_;
+        if (stamps_) {   // STRATA_POOL_STAMPS: the thread's first claim of this phase
+            if (st_tasks_[sid].fetch_add(1, std::memory_order_relaxed) == 0)
+                st_first_[sid].store(std::chrono::steady_clock::now().time_since_epoch().count(), std::memory_order_relaxed);
+        }
         if (mode_ == 0) {
             const ExpertJob& j = jobs_[i];
             s2_expert_vnni_q(j.blob, *j.act, j.out, scratch);
@@ -683,20 +695,90 @@ void ExpertPool::drain(int id, ExpertScratch& scratch, uint32_t epoch) {
                 r += r1 - r0;
             }
         }
+        if (stamps_) st_last_[sid].store(std::chrono::steady_clock::now().time_since_epoch().count(), std::memory_order_relaxed);
         done_.fetch_add(1, std::memory_order_release);
     }
 }
 
 void ExpertPool::run_phase(int mode, int n_tasks) {
+    if (!stamps_) {
+        wait_parked("before a phase");
+        mode_ = mode;
+        njobs_ = n_tasks;
+        const uint32_t e = begin_batch(n_tasks);
+        if (host_works_) drain(-1, host_scratch_, e);
+        wait_done(n_tasks);
+        wait_parked("after a phase");
+        hstate_.store(kIdle, std::memory_order_relaxed);
+        hstate_ms_.store(now_ms(), std::memory_order_relaxed);
+        return;
+    }
+    // STRATA_POOL_STAMPS: the same phase, timed (the clock reads cost the phase a few hundred ns)
+    using SC = std::chrono::steady_clock;
+    for (int i = 0; i <= n_; ++i) { st_first_[(size_t) i].store(0); st_last_[(size_t) i].store(0); st_tasks_[(size_t) i].store(0); }
+    const auto t0 = SC::now();
     wait_parked("before a phase");
     mode_ = mode;
     njobs_ = n_tasks;
+    const bool sleeping = sleepers_.load(std::memory_order_relaxed) != 0;
     const uint32_t e = begin_batch(n_tasks);
+    const auto t1 = SC::now();
     if (host_works_) drain(-1, host_scratch_, e);
+    const auto t2 = SC::now();
     wait_done(n_tasks);
+    const auto t3 = SC::now();
     wait_parked("after a phase");
+    const auto t4 = SC::now();
     hstate_.store(kIdle, std::memory_order_relaxed);
     hstate_ms_.store(now_ms(), std::memory_order_relaxed);
+    StampSum& s = st_sum_[(mode == 4 || mode == 6 || mode == 2) ? 1 : 0];
+    const int64_t p = t1.time_since_epoch().count();
+    int64_t first = 0, last = 0, lsum = 0;
+    int threads = 0;
+    for (int i = 0; i <= n_; ++i) {
+        const int32_t nt = st_tasks_[(size_t) i].load(std::memory_order_relaxed);
+        if (nt == 0) continue;
+        ++threads;
+        s.tasks += nt;
+        if (i == n_) s.host_tasks += nt;
+        const int64_t f = st_first_[(size_t) i].load(std::memory_order_relaxed), l = st_last_[(size_t) i].load(std::memory_order_relaxed);
+        if (first == 0 || f < first) first = f;
+        if (l > last) last = l;
+        lsum += l - p;
+    }
+    const double ms = 1e-6;
+    s.park += ms * (double) (t1 - t0).count();
+    if (first != 0) s.wake += ms * (double) (first - p);
+    if (last != 0) s.work += ms * (double) (last - p);
+    if (threads > 0) s.mean_done += ms * (double) lsum / threads;
+    s.host += ms * (double) (t2 - t1).count();
+    const int64_t done_at = std::max<int64_t>(last, t2.time_since_epoch().count());
+    s.seen += ms * (double) (t3.time_since_epoch().count() - done_at);
+    s.repark += ms * (double) (t4 - t3).count();
+    ++s.phases;
+    s.sleepers += sleeping ? 1 : 0;
+    s.threads += threads;
+}
+
+std::string ExpertPool::stamps_report() {
+    if (!stamps_) return std::string();
+    std::string out;
+    char b[320];
+    for (int k = 0; k < 2; ++k) {
+        StampSum& s = st_sum_[k];
+        if (s.phases == 0) continue;
+        const double n = (double) s.phases;
+        std::snprintf(b, sizeof b,
+                      "%s%s phases %lld: per phase us: park-wait %.1f, publish->first claim %.1f, publish->last done %.1f "
+                      "(mean thread finish %.1f, host's own drain %.1f), last done->host sees it %.1f, re-park %.1f; threads with a task %.2f of %d, "
+                      "tasks %.1f (host %.1f); phases that woke a sleeper %lld",
+                      k == 0 ? "" : " |", k == 0 ? "gate/up" : "down", (long long) s.phases, 1e3 * s.park / n, 1e3 * s.wake / n,
+                      1e3 * s.work / n, 1e3 * s.mean_done / n, 1e3 * s.host / n, 1e3 * s.seen / n, 1e3 * s.repark / n, (double) s.threads / n,
+                      n_ + (host_works_ ? 1 : 0), (double) s.tasks / n, (double) s.host_tasks / n, (long long) s.sleepers);
+        out += b;
+        s = StampSum{};
+    }
+    return out;
 }
 
 void ExpertPool::run_split(ExpertJob* jobs, int n) {

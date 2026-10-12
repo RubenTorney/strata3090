@@ -1,0 +1,11 @@
+WARNING: --no-deterministic: nothing is pinned; hashes may differ run to run
+[full_int8_r0] start, free RAM 59.7 GB
+[full_int8_r0] up after 27 s
+  round 0 full_int8: median 91.1 tok/s over 2 prompts
+[full_int8_r1] start, free RAM 59.8 GB
+[full_int8_r1] up after 27 s
+  round 1 full_int8: median 91.8 tok/s over 2 prompts
+[full_int8_r2] start, free RAM 59.8 GB
+[full_int8_r2] up after 27 s
+  round 2 full_int8: median 90.0 tok/s over 2 prompts
+full_int8: median 90.3 tok/s over all 2 prompts (not paired)

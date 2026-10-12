@@ -1,0 +1,35 @@
+WARNING: --no-deterministic: nothing is pinned; hashes may differ run to run
+WARNING: --rounds 1 is not a multiple of the 4 arms: the arm order is not balanced
+[mtpq4all_r0] start, free RAM 59.8 GB
+[mtpq4all_r0] up after 27 s
+  round 0 mtpq4all: median 120.3 tok/s over 12 prompts
+[mtpq4proj_r0] start, free RAM 59.8 GB
+[mtpq4proj_r0] up after 27 s
+  round 0 mtpq4proj: median 117.9 tok/s over 12 prompts
+[q2bp2_r0] start, free RAM 59.8 GB
+[q2bp2_r0] up after 27 s
+  round 0 q2bp2: median 122.8 tok/s over 12 prompts
+[ref2_r0] start, free RAM 59.8 GB
+[ref2_r0] up after 27 s
+  round 0 ref2: median 122.2 tok/s over 12 prompts
+mtpq4all: median 120.3 tok/s over all 12 prompts (not paired)
+mtpq4proj: median 117.9 tok/s over all 12 prompts (not paired)
+q2bp2: median 122.8 tok/s over all 12 prompts (not paired)
+ref2: median 122.2 tok/s over all 12 prompts (not paired)
+
+mtpq4proj vs mtpq4all: paired ratio median 1.006, prompts faster 1/2
+  WARNING: only 2/12 prompts are comparable: a ratio over a minority is not the arm's speed
+  text diverged (excluded): prompts [0, 1, 2, 3, 4, 5, 6, 7, 8, 10] - the arms did different work there. Excluding them selects the prompts where the change did not alter the text, which can bias the ratio
+    prompt  9: 1.025
+    prompt 11: 0.986
+
+q2bp2 vs mtpq4all: paired ratio median 1.042, prompts faster 1/1
+  WARNING: only 1/12 prompts are comparable: a ratio over a minority is not the arm's speed
+  text diverged (excluded): prompts [0, 1, 2, 3, 4, 5, 6, 7, 8, 10, 11] - the arms did different work there. Excluding them selects the prompts where the change did not alter the text, which can bias the ratio
+    prompt  9: 1.042
+
+ref2 vs mtpq4all: paired ratio median 1.025, prompts faster 2/2
+  WARNING: only 2/12 prompts are comparable: a ratio over a minority is not the arm's speed
+  text diverged (excluded): prompts [0, 1, 2, 3, 4, 5, 6, 8, 10, 11] - the arms did different work there. Excluding them selects the prompts where the change did not alter the text, which can bias the ratio
+    prompt  7: 1.017
+    prompt  9: 1.034

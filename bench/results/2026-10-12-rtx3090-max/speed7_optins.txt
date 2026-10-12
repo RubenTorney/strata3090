@@ -1,0 +1,52 @@
+WARNING: --no-deterministic: nothing is pinned; hashes may differ run to run
+WARNING: --rounds 1 is not a multiple of the 11 arms: the arm order is not balanced
+[ref_r0] start, free RAM 59.8 GB
+[ref_r0] up after 27 s
+  round 0 ref: median 123.7 tok/s over 12 prompts
+[min1_r0] start, free RAM 59.8 GB
+[min1_r0] up after 27 s
+  round 0 min1: median 120.5 tok/s over 12 prompts
+[min1pf60_r0] start, free RAM 59.8 GB
+[min1pf60_r0] up after 27 s
+  round 0 min1pf60: median 117.9 tok/s over 12 prompts
+[fs2_r0] start, free RAM 59.8 GB
+[fs2_r0] up after 27 s
+  round 0 fs2: median 111.1 tok/s over 12 prompts
+[fs4_r0] start, free RAM 59.8 GB
+[fs4_r0] up after 27 s
+Traceback (most recent call last):
+  File "/home/ruben/Documents/strata3090/tools/strata_ab_linux.py", line 690, in <module>
+    sys.exit(main())
+             ^^^^^^
+  File "/home/ruben/Documents/strata3090/tools/strata_ab_linux.py", line 686, in main
+    return {"probe": cmd_probe, "parity": cmd_parity, "speed": cmd_speed}[ctx.command](ctx)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ruben/Documents/strata3090/tools/strata_ab_linux.py", line 610, in cmd_speed
+    rows, st = run_arm_once(ctx, base, arm, f"{arm['name']}_r{rnd}", prompts, ctx.out)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ruben/Documents/strata3090/tools/strata_ab_linux.py", line 532, in run_arm_once
+    eng = Engine(ctx, tag, make_cfg(ctx, base, arm))      # a failed start stops itself
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ruben/Documents/strata3090/tools/strata_ab_linux.py", line 408, in __init__
+    self.ask(p, max_tokens=48)
+  File "/home/ruben/Documents/strata3090/tools/strata_ab_linux.py", line 421, in ask
+    with urllib.request.urlopen(r, timeout=self.ctx.request_timeout) as resp:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/urllib/request.py", line 215, in urlopen
+    return opener.open(url, data, timeout)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/urllib/request.py", line 521, in open
+    response = meth(req, response)
+               ^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/urllib/request.py", line 630, in http_response
+    response = self.parent.error(
+               ^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/urllib/request.py", line 559, in error
+    return self._call_chain(*args)
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/urllib/request.py", line 492, in _call_chain
+    result = func(*args)
+             ^^^^^^^^^^^
+  File "/usr/lib/python3.12/urllib/request.py", line 639, in http_error_default
+    raise HTTPError(req.full_url, code, msg, hdrs, fp)
+urllib.error.HTTPError: HTTP Error 400: Bad Request

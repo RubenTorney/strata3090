@@ -1,0 +1,70 @@
+WARNING: --no-deterministic: nothing is pinned; hashes may differ run to run
+WARNING: --rounds 1 is not a multiple of the 6 arms: the arm order is not balanced
+[ref_r0] start, free RAM 59.8 GB
+[ref_r0] up after 27 s
+  round 0 ref: median 122.5 tok/s over 12 prompts
+[q2bp_r0] start, free RAM 59.8 GB
+[q2bp_r0] up after 27 s
+  round 0 q2bp: median 123.4 tok/s over 12 prompts
+[xrot_r0] start, free RAM 59.8 GB
+[xrot_r0] up after 27 s
+  round 0 xrot: median 122.4 tok/s over 12 prompts
+[lag2_r0] start, free RAM 59.8 GB
+[lag2_r0] up after 27 s
+  round 0 lag2: median 122.3 tok/s over 12 prompts
+[demand_r0] start, free RAM 59.8 GB
+[demand_r0] up after 27 s
+  round 0 demand: median 119.0 tok/s over 12 prompts
+[mtmin1_r0] start, free RAM 59.8 GB
+[mtmin1_r0] up after 24 s
+  round 0 mtmin1: median 121.1 tok/s over 12 prompts
+ref: median 122.5 tok/s over all 12 prompts (not paired)
+q2bp: median 123.4 tok/s over all 12 prompts (not paired)
+xrot: median 122.4 tok/s over all 12 prompts (not paired)
+lag2: median 122.3 tok/s over all 12 prompts (not paired)
+demand: median 119.0 tok/s over all 12 prompts (not paired)
+mtmin1: median 121.1 tok/s over all 12 prompts (not paired)
+
+q2bp vs ref: paired ratio median 1.008, prompts faster 1/1
+  WARNING: only 1/12 prompts are comparable: a ratio over a minority is not the arm's speed
+  text diverged (excluded): prompts [0, 1, 2, 3, 4, 5, 6, 7, 8, 10, 11] - the arms did different work there. Excluding them selects the prompts where the change did not alter the text, which can bias the ratio
+    prompt  9: 1.008
+
+xrot vs ref: paired ratio median 0.997, prompts faster 0/12
+    prompt  0: 0.998
+    prompt  1: 0.997
+    prompt  2: 0.995
+    prompt  3: 0.998
+    prompt  4: 0.998
+    prompt  5: 0.996
+    prompt  6: 1.000
+    prompt  7: 1.000
+    prompt  8: 0.998
+    prompt  9: 0.996
+    prompt 10: 0.995
+    prompt 11: 0.995
+
+lag2 vs ref: paired ratio median 0.998, prompts faster 0/12
+    prompt  0: 0.997
+    prompt  1: 0.999
+    prompt  2: 0.997
+    prompt  3: 0.996
+    prompt  4: 0.999
+    prompt  5: 0.996
+    prompt  6: 0.999
+    prompt  7: 0.999
+    prompt  8: 0.998
+    prompt  9: 0.998
+    prompt 10: 0.996
+    prompt 11: 0.998
+
+demand vs ref: paired ratio median 1.003, prompts faster 1/2
+  WARNING: only 2/12 prompts are comparable: a ratio over a minority is not the arm's speed
+  text diverged (excluded): prompts [0, 1, 2, 3, 4, 5, 6, 8, 10, 11] - the arms did different work there. Excluding them selects the prompts where the change did not alter the text, which can bias the ratio
+    prompt  7: 1.018
+    prompt  9: 0.987
+
+mtmin1 vs ref: paired ratio median 0.997, prompts faster 0/1
+  WARNING: only 1/12 prompts are comparable: a ratio over a minority is not the arm's speed
+  text diverged (excluded): prompts [0, 1, 2, 3, 4, 5, 6, 7, 8, 10, 11] - the arms did different work there. Excluding them selects the prompts where the change did not alter the text, which can bias the ratio
+    prompt  9: 0.997

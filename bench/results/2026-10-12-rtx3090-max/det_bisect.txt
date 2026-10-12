@@ -1,0 +1,29 @@
+  n0 engine 0: 5adde4 5d7577 08f3fe 64d2e9 9c6636 954bd8 df750a 6ef21a 8e85bd 5b8637 bc1d49 177ec9
+  n0 engine 1: 5adde4 5d7577 08f3fe 64d2e9 9c6636 954bd8 df750a 6ef21a 8e85bd 5b8637 bc1d49 177ec9
+n0: self-consistent over 2 engines (12/12 prompts)
+  pf0 engine 0: b57d4a 773404 57b08e d491b0 9c6636 954bd8 a2913d 6ef21a 8e85bd 5b8637 bc1d49 177ec9
+  pf0 engine 1: b57d4a 773404 57b08e d491b0 9c6636 954bd8 a2913d 6ef21a 8e85bd 5b8637 bc1d49 177ec9
+pf0: self-consistent over 2 engines (12/12 prompts)
+  timed out after 600 s waiting for the server to answer
+ench/results/2026-10-12-rtx3090-max/ab_work/ab_spec1_0.log)
+the engine log's last lines:
+  strata generate: memory guard: limit 62.7 GiB (source: meminfo), current 4.2 GiB, reclaimable cache credited 0.0 GiB; available 58.5 GiB (MemAvailable 58.5 GiB), floor 2560 MiB
+  strata: STRATA_DETERMINISTIC=1: no lookup drafts (the draft policy reads round times), no PCIe probe or refinement, no CPU prefill share by default, the asynchronous tier only where it is driven by the window count
+  strata generate: this CPU has no AVX-512: the expert kernels run on AVX-2 (multi-token for the i-quant gate/up rows)
+  strata generate: /home/ruben/Documents/Strata-data/packs/iq3_s is a native (IQ) pack: it needs --native SHARD1, --spec T (T >= 2) and --prefill CHUNK
+
+  pw1 engine 0: 5adde4 5d7577 08f3fe 64d2e9 9c6636 954bd8 df750a 6ef21a 8e85bd 5b8637 bc1d49 177ec9
+  pw1 engine 1: 5adde4 5d7577 08f3fe 64d2e9 9c6636 954bd8 df750a 6ef21a 8e85bd 5b8637 bc1d49 177ec9
+pw1: self-consistent over 2 engines (12/12 prompts)
+  timed out after 600 s waiting for the server to answer
+ench/results/2026-10-12-rtx3090-max/ab_work/ab_pf0spec1_0.log)
+the engine log's last lines:
+  strata generate: memory guard: limit 62.7 GiB (source: meminfo), current 4.1 GiB, reclaimable cache credited 0.0 GiB; available 58.6 GiB (MemAvailable 58.6 GiB), floor 2560 MiB
+  strata: STRATA_DETERMINISTIC=1: no lookup drafts (the draft policy reads round times), no PCIe probe or refinement, no CPU prefill share by default, the asynchronous tier only where it is driven by the window count
+  strata generate: this CPU has no AVX-512: the expert kernels run on AVX-2 (multi-token for the i-quant gate/up rows)
+  strata generate: /home/ruben/Documents/Strata-data/packs/iq3_s is a native (IQ) pack: it needs --native SHARD1, --spec T (T >= 2) and --prefill CHUNK
+
+  n0_256 engine 0: a0dac4 f7c630 18d50b 63437e 950df6 f125e1 9d0aa7 af41fc 3381b4 7e316c f1dce3 adaabd
+  n0_256 engine 1: a0dac4 f7c630 18d50b 63437e 950df6 f125e1 9d0aa7 af41fc 3381b4 7e316c f1dce3 adaabd
+  n0_256 engine 2: a0dac4 f7c630 18d50b 63437e 950df6 f125e1 9d0aa7 af41fc 3381b4 7e316c f1dce3 adaabd
+n0_256: self-consistent over 3 engines (12/12 prompts)

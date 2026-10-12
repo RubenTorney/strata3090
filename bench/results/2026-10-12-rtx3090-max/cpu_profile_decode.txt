@@ -1,0 +1,30 @@
+    63.34%  strata                [.] strata::kernels::cpu::ExpertPool::worker(int)                                                                                                                     
+    10.18%  strata                [.] strata::core::Verifier::run(int, int const*, long, void (*)(void*, float const*, int const*, long, long, float*, long), void*, int*, std::__cxx11::basic_string<ch
+     5.23%  strata                [.] void strata::kernels::cpu::(anonymous namespace)::plain::gu_rows_nt<322>(int, unsigned char const*, unsigned long, unsigned long, int, void const* const*, float* 
+     4.37%  strata                [.] ggml_vec_dot_iq3_xxs_q8_K                                                                                                                                         
+     4.01%  strata                [.] ggml_vec_dot_iq4_nl_q8_0                                                                                                                                          
+     2.34%  strata                [.] void strata::kernels::cpu::(anonymous namespace)::plain::row_dot<21, 1>(unsigned char const*, int, block_q8_K const* const*, float*)                              
+     1.99%  strata                [.] strata::kernels::cpu::(anonymous namespace)::plain::iq4nl_nt(unsigned char const*, unsigned long, int, block_q8_0 const* const*, int, float* const*, int, int)    
+     1.29%  strata                [.] void strata::kernels::cpu::(anonymous namespace)::plain::row_dot<18, 2>(unsigned char const*, int, block_q8_K const* const*, float*)                              
+     1.19%  strata                [.] strata::kernels::cpu::(anonymous namespace)::plain::rows_nt(unsigned char const*, unsigned long, int, strata::kernels::cpu::ActQ const* const*, int, float* const*
+     1.11%  strata                [.] strata::core::MtpDrafter::draft(int, int const*, long, int, int*, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&, float*, float,
+     0.85%  strata                [.] void strata::kernels::cpu::(anonymous namespace)::plain::row_dot<321, 2>(unsigned char const*, int, block_q8_K const* const*, float*)                             
+     0.49%  strata                [.] void strata::kernels::cpu::(anonymous namespace)::plain::row_dot<322, 3>(unsigned char const*, int, block_q8_K const* const*, float*)                             
+     0.35%  strata                [.] void strata::kernels::cpu::(anonymous namespace)::plain::row_dot<18, 3>(unsigned char const*, int, block_q8_K const* const*, float*)                              
+     0.23%  strata                [.] void strata::kernels::cpu::(anonymous namespace)::plain::row_dot<321, 3>(unsigned char const*, int, block_q8_K const* const*, float*)                             
+     0.18%  strata                [.] strata::kernels::cpu::ExpertPool::wait_done(int)                                                                                                                  
+     0.15%  strata                [.] void strata::kernels::cpu::(anonymous namespace)::plain::row_dot<322, 4>(unsigned char const*, int, block_q8_K const* const*, float*)                             
+     0.14%  strata                [.] strata::kernels::cpu::native_down_rows(strata::kernels::cpu::NativeFmt const&, unsigned char const*, void const* const*, int, float* const*, int, int)            
+     0.13%  [vdso]                [.] 0x0000000000000997                                                                                                                                                
+     0.12%  strata                [.] ggml_vec_dot_iq4_xs_q8_K                                                                                                                                          
+     0.10%  strata                [.] void strata::kernels::cpu::(anonymous namespace)::plain::row_dot<18, 4>(unsigned char const*, int, block_q8_K const* const*, float*)                              
+     0.09%  strata                [.] void strata::kernels::cpu::(anonymous namespace)::plain::row_dot<321, 4>(unsigned char const*, int, block_q8_K const* const*, float*)                             
+     0.08%  libm.so.6             [.] __expf_fma                                                                                                                                                        
+     0.08%  strata                [.] strata::core::expert_pool_dispatch_multi(strata::core::ExpertDispatch&, float const*, int const*, long, long, float*)                                             
+     0.05%  strata                [.] strata::kernels::cpu::q8k_quant_avx2(float const*, void*, long)                                                                                                   
+     0.04%  strata                [.] main::{lambda()#32}::operator()() const                                                                                                                           
+     0.04%  [kernel.kallsyms]     [k] 0xffffffffaec001bd                                                                                                                                                
+     0.04%  strata                [.] strata::kernels::cpu::native_gu_rows(strata::kernels::cpu::NativeFmt const&, unsigned char const*, void const* const*, int, float* const*, int, int)              
+     0.04%  strata                [.] strata::kernels::cpu::ExpertPool::drain(int, strata::kernels::cpu::ExpertScratch&, unsigned int)                                                                  
+     0.03%  libcuda.so.595.99.02  [.] 0x000000000021ea09                                                                                                                                                
+     0.03%  libcuda.so.595.99.02  [.] 0x000000000022c1b8                                                                                                                                                

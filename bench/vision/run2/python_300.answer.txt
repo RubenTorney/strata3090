@@ -1,0 +1,380 @@
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Python</title>
+<style>
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
+  body {
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    background: #fff;
+    color: #333;
+  }
+
+  a {
+    text-decoration: none;
+    color: inherit;
+  }
+
+  /* Top navigation bar */
+  .top-nav {
+    background: #2b2b2b;
+    display: flex;
+    align-items: center;
+    height: 40px;
+    font-size: 14px;
+    color: #fff;
+  }
+
+  .top-nav a {
+    color: #fff;
+    padding: 0 20px;
+    line-height: 40px;
+    display: inline-block;
+    height: 40px;
+  }
+
+  .top-nav a:hover {
+    background: #444;
+  }
+
+  .top-nav a.active {
+    background: #f5a623;
+    color: #fff;
+  }
+
+  /* Header area */
+  .header {
+    background: #2b5b84;
+    padding: 20px 40px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .logo-area {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .logo-icon {
+    width: 50px;
+    height: 50px;
+    position: relative;
+  }
+
+  .logo-icon svg {
+    width: 50px;
+    height: 50px;
+  }
+
+  .logo-text {
+    font-size: 36px;
+    color: #fff;
+    font-weight: 300;
+    letter-spacing: 1px;
+  }
+
+  .logo-text sup {
+    font-size: 12px;
+    vertical-align: super;
+  }
+
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+  }
+
+  .donate-btn {
+    background: #f5a623;
+    color: #fff;
+    padding: 8px 20px;
+    border-radius: 4px;
+    font-size: 14px;
+    font-weight: bold;
+    cursor: pointer;
+    border: none;
+  }
+
+  .search-area {
+    display: flex;
+    align-items: center;
+  }
+
+  .search-icon {
+    color: #ccc;
+    margin-right: 5px;
+    font-size: 18px;
+  }
+
+  .search-input {
+    width: 180px;
+    padding: 8px 12px;
+    border: none;
+    border-radius: 3px;
+    font-size: 14px;
+    background: #fff;
+  }
+
+  .go-btn {
+    background: #4a7ba5;
+    color: #fff;
+    padding: 8px 14px;
+    border: none;
+    border-radius: 3px;
+    font-size: 14px;
+    cursor: pointer;
+    margin-left: 4px;
+  }
+
+  .socialize-btn {
+    background: #3a3a3a;
+    color: #fff;
+    padding: 8px 16px;
+    border-radius: 4px;
+    font-size: 14px;
+    cursor: pointer;
+    border: none;
+  }
+
+  /* Sub navigation */
+  .sub-nav {
+    background: #4a7ba5;
+    display: flex;
+    justify-content: center;
+    padding: 0;
+  }
+
+  .sub-nav a {
+    color: #fff;
+    padding: 14px 24px;
+    font-size: 15px;
+    display: inline-block;
+  }
+
+  .sub-nav a:hover {
+    background: #3a6a94;
+  }
+
+  /* Main content area */
+  .main-content {
+    background: #2b5b84;
+    padding: 30px 40px 40px;
+    text-align: center;
+  }
+
+  .banner-area {
+    background: #1a3a5c;
+    width: 100%;
+    max-width: 900px;
+    height: 280px;
+    margin: 0 auto 20px;
+    border-radius: 4px;
+    position: relative;
+  }
+
+  .banner-dots {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    margin-bottom: 20px;
+  }
+
+  .banner-dots span {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    color: #fff;
+    cursor: pointer;
+  }
+
+  .banner-dots span.active {
+    background: #4a7ba5;
+  }
+
+  .banner-dots span:not(.active) {
+    background: #3a6a94;
+  }
+
+  .tagline {
+    color: #d0d8e0;
+    font-size: 22px;
+    line-height: 1.6;
+    max-width: 700px;
+    margin: 0 auto;
+  }
+
+  .tagline a {
+    color: #f5a623;
+    font-weight: bold;
+  }
+
+  .tagline a:hover {
+    text-decoration: underline;
+  }
+
+  /* Bottom sections */
+  .bottom-sections {
+    background: #fff;
+    padding: 40px 40px 50px;
+    display: flex;
+    justify-content: center;
+    gap: 30px;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+
+  .section-card {
+    flex: 1;
+    max-width: 280px;
+    border-top: 3px solid #4a7ba5;
+    padding-top: 20px;
+  }
+
+  .section-card h2 {
+    font-size: 20px;
+    color: #333;
+    margin-bottom: 12px;
+    font-weight: 400;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .section-card h2 .icon {
+    font-size: 22px;
+    color: #4a7ba5;
+  }
+
+  .section-card p {
+    font-size: 14px;
+    color: #555;
+    line-height: 1.6;
+    margin-bottom: 10px;
+  }
+
+  .section-card a.link {
+    color: #4a7ba5;
+    font-size: 14px;
+  }
+
+  .section-card a.link:hover {
+    text-decoration: underline;
+  }
+
+  .section-card a.link strong {
+    color: #333;
+  }
+
+  .section-card .highlight {
+    color: #4a7ba5;
+    font-weight: bold;
+  }
+</style>
+</head>
+<body>
+
+<!-- Top Navigation -->
+<nav class="top-nav">
+  <a href="#">Python</a>
+  <a href="#">PSF</a>
+  <a href="#" class="active">Docs</a>
+  <a href="#">PyPI</a>
+  <a href="#">Jobs</a>
+  <a href="#">Community</a>
+</nav>
+
+<!-- Header -->
+<div class="header">
+  <div class="logo-area">
+    <div class="logo-icon">
+      <svg viewBox="0 0 50 50" xmlns="http://www.w3.org/2000/svg">
+        <path d="M24.5 2C13 2 14 7 14 7v5h11v2H10s-8-1-8 10 7 11 7 11h5v-5s0-4 4-4h14s4 0 4-4V6s1-4-11-4z" fill="#3776ab"/>
+        <circle cx="17" cy="7" r="1.5" fill="#fff"/>
+        <path d="M25.5 48C37 48 36 43 36 43v-5H25v-2h15s8 1 8-10-7-11-7-11h-5v5s0 4-4 4H18s-4 0-4 4v14s-1 4 11.5 4z" fill="#ffd343"/>
+        <circle cx="33" cy="43" r="1.5" fill="#fff"/>
+      </svg>
+    </div>
+    <span class="logo-text">python<sup>™</sup></span>
+  </div>
+  <div class="header-right">
+    <button class="donate-btn">Donate</button>
+    <div class="search-area">
+      <span class="search-icon">🔍</span>
+      <input type="text" class="search-input" placeholder="Search">
+      <button class="go-btn">GO</button>
+    </div>
+    <button class="socialize-btn">Socialize</button>
+  </div>
+</div>
+
+<!-- Sub Navigation -->
+<nav class="sub-nav">
+  <a href="#">About</a>
+  <a href="#">Downloads</a>
+  <a href="#">Documentation</a>
+  <a href="#">Community</a>
+  <a href="#">Success Stories</a>
+  <a href="#">News</a>
+  <a href="#">Events</a>
+</nav>
+
+<!-- Main Content -->
+<div class="main-content">
+  <div class="banner-area"></div>
+  <div class="banner-dots">
+    <span class="active">1</span>
+    <span>2</span>
+    <span>3</span>
+    <span>4</span>
+    <span>5</span>
+  </div>
+  <p class="tagline">
+    Python is a programming language that lets you work quickly<br>
+    and integrate systems more effectively. <a href="#">>>> Learn More</a>
+  </p>
+</div>
+
+<!-- Bottom Sections -->
+<div class="bottom-sections">
+  <div class="section-card">
+    <h2><span class="icon">⚙</span> Get Started</h2>
+    <p>Whether you're new to programming or an experienced developer, it's easy to learn and use Python.</p>
+    <a href="#" class="link">Start with our Beginner's Guide</a>
+  </div>
+
+  <div class="section-card">
+    <h2><span class="icon">⬇</span> Download</h2>
+    <p>Python source code and installers are available for download for all versions!</p>
+    <p>Latest: <a href="#" class="link">Python 3.15.0</a></p>
+  </div>
+
+  <div class="section-card">
+    <h2><span class="icon">📄</span> Docs</h2>
+    <p>Documentation for Python's standard library, along with tutorials and guides, are available online.</p>
+    <a href="#" class="link">docs.python.org</a>
+  </div>
+
+  <div class="section-card">
+    <h2><span class="icon">💼</span> Jobs</h2>
+    <p>Looking for work or have a Python related position that you're trying to hire for? Our <strong>relaunched</strong> <a href="#" class="link">community-run job board</a> is the place to go.</p>
+    <a href="#" class="link">jobs.python.org</a>
+  </div>
+</div>
+
+</body>
+</html>
+```

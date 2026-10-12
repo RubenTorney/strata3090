@@ -1,0 +1,386 @@
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Python</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    background: #000;
+    color: #fff;
+  }
+
+  /* Top navigation bar */
+  .top-nav {
+    background: #2b2b2b;
+    display: flex;
+    justify-content: center;
+    border-bottom: 1px solid #444;
+  }
+  .top-nav ul {
+    list-style: none;
+    display: flex;
+    width: 100%;
+    max-width: 1200px;
+  }
+  .top-nav li {
+    flex: 1;
+    text-align: center;
+    position: relative;
+  }
+  .top-nav li a {
+    display: block;
+    padding: 14px 0;
+    color: #ccc;
+    text-decoration: none;
+    font-size: 14px;
+    border-right: 1px solid #444;
+  }
+  .top-nav li:first-child a { border-left: 1px solid #444; }
+  .top-nav li a:hover { color: #fff; }
+  .top-nav li.active a { color: #fff; }
+  .top-nav li.active::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0;
+    height: 0;
+    border-left: 8px solid transparent;
+    border-right: 8px solid transparent;
+    border-top: 8px solid #3776ab;
+  }
+  /* Colored top borders */
+  .top-nav li:nth-child(1) { border-top: 3px solid #3776ab; }
+  .top-nav li:nth-child(2) { border-top: 3px solid #3776ab; }
+  .top-nav li:nth-child(3) { border-top: 3px solid #f5c542; }
+  .top-nav li:nth-child(4) { border-top: 3px solid #6a9955; }
+  .top-nav li:nth-child(5) { border-top: 3px solid #9b59b6; }
+  .top-nav li:nth-child(6) { border-top: 3px solid #e74c3c; }
+
+  /* Main header area */
+  .header-area {
+    background: linear-gradient(180deg, #2a5a8a 0%, #3a6a9a 50%, #2a5a8a 100%);
+    padding: 20px 0 0 0;
+  }
+  .header-inner {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 20px;
+  }
+  .header-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+  }
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .logo-icon {
+    width: 60px;
+    height: 60px;
+    position: relative;
+  }
+  .logo-icon svg {
+    width: 60px;
+    height: 60px;
+  }
+  .logo-text {
+    font-size: 36px;
+    font-weight: 300;
+    color: #fff;
+    letter-spacing: 1px;
+  }
+  .logo-text sup {
+    font-size: 12px;
+    vertical-align: super;
+  }
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+  }
+  .donate-btn {
+    background: #f5c542;
+    color: #333;
+    border: none;
+    padding: 8px 20px;
+    border-radius: 4px;
+    font-size: 14px;
+    font-weight: bold;
+    cursor: pointer;
+  }
+  .search-box {
+    display: flex;
+    align-items: center;
+    background: #1a3a5a;
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  .search-icon {
+    padding: 8px 10px;
+    color: #aaa;
+    font-size: 16px;
+  }
+  .search-box input {
+    background: #fff;
+    border: none;
+    padding: 8px 12px;
+    width: 180px;
+    font-size: 14px;
+    color: #333;
+  }
+  .search-box input::placeholder { color: #999; }
+  .search-go {
+    background: #3776ab;
+    color: #fff;
+    border: none;
+    padding: 8px 14px;
+    font-size: 14px;
+    font-weight: bold;
+    cursor: pointer;
+  }
+  .socialize-btn {
+    background: #1a3a5a;
+    color: #ccc;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    font-size: 14px;
+    cursor: pointer;
+  }
+
+  /* Sub navigation */
+  .sub-nav {
+    background: linear-gradient(180deg, #4a8abf 0%, #3a7aaf 100%);
+    border-radius: 6px;
+    display: flex;
+    justify-content: center;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  }
+  .sub-nav a {
+    color: #fff;
+    text-decoration: none;
+    padding: 14px 24px;
+    font-size: 15px;
+    border-right: 1px solid rgba(255,255,255,0.15);
+    transition: background 0.2s;
+  }
+  .sub-nav a:first-child { border-left: 1px solid rgba(255,255,255,0.15); }
+  .sub-nav a:hover { background: rgba(255,255,255,0.1); }
+
+  /* Hero / slideshow area */
+  .hero-area {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 20px;
+  }
+  .slideshow {
+    background: #1a2a3a;
+    border-radius: 4px;
+    height: 300px;
+    position: relative;
+    margin-bottom: 15px;
+  }
+  .slide-dots {
+    position: absolute;
+    bottom: 15px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 8px;
+  }
+  .slide-dots a {
+    display: inline-block;
+    width: 28px;
+    height: 28px;
+    background: #3a6a9a;
+    color: #fff;
+    text-align: center;
+    line-height: 28px;
+    border-radius: 4px;
+    text-decoration: none;
+    font-size: 13px;
+  }
+  .slide-dots a.active {
+    background: #4a8abf;
+  }
+
+  /* Tagline */
+  .tagline {
+    text-align: center;
+    padding: 20px 0 30px;
+    font-size: 22px;
+    color: #d0d8e0;
+    line-height: 1.6;
+  }
+  .tagline a {
+    color: #f5c542;
+    text-decoration: underline;
+  }
+  .tagline .arrows {
+    color: #f5c542;
+    font-weight: bold;
+  }
+
+  /* Bottom content sections */
+  .content-sections {
+    background: #f0f0f0;
+    padding: 40px 20px;
+  }
+  .content-inner {
+    max-width: 1200px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 30px;
+  }
+  .content-card {
+    border-top: 3px solid #4a8abf;
+    padding-top: 20px;
+  }
+  .content-card h2 {
+    font-size: 22px;
+    color: #333;
+    margin-bottom: 12px;
+    font-weight: normal;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .content-card h2 .icon {
+    font-size: 20px;
+    color: #3776ab;
+  }
+  .content-card p {
+    font-size: 14px;
+    color: #555;
+    line-height: 1.6;
+    margin-bottom: 10px;
+  }
+  .content-card a {
+    color: #3776ab;
+    text-decoration: none;
+    font-size: 14px;
+  }
+  .content-card a:hover { text-decoration: underline; }
+  .content-card strong { color: #333; }
+
+  @media (max-width: 900px) {
+    .content-inner { grid-template-columns: repeat(2, 1fr); }
+    .header-top { flex-direction: column; gap: 15px; }
+    .sub-nav { flex-wrap: wrap; }
+  }
+  @media (max-width: 500px) {
+    .content-inner { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Top Navigation -->
+<nav class="top-nav">
+  <ul>
+    <li class="active"><a href="#">Python</a></li>
+    <li><a href="#">PSF</a></li>
+    <li><a href="#">Docs</a></li>
+    <li><a href="#">PyPI</a></li>
+    <li><a href="#">Jobs</a></li>
+    <li><a href="#">Community</a></li>
+  </ul>
+</nav>
+
+<!-- Header Area -->
+<div class="header-area">
+  <div class="header-inner">
+    <div class="header-top">
+      <div class="logo">
+        <div class="logo-icon">
+          <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+            <!-- Python logo simplified -->
+            <path d="M48 10c-15 0-14 7-14 7v10h15v3H25s-10-1-10 14c0 15 9 14 9 14h7v-8s0-9 9-9h16s9 0 9-9V19s0-9-17-9zm-8 4a3 3 0 110 6 3 3 0 010-6z" fill="#3776ab"/>
+            <path d="M52 90c15 0 14-7 14-7V73H51v-3h24s10 1 10-14c0-15-9-14-9-14h-7v8s0 9-9 9H44s-9 0-9 9v11s0 9 17 9zm8-4a3 3 0 110-6 3 3 0 010 6z" fill="#f5c542"/>
+          </svg>
+        </div>
+        <span class="logo-text">python<sup>™</sup></span>
+      </div>
+      <div class="header-right">
+        <button class="donate-btn">Donate</button>
+        <div class="search-box">
+          <span class="search-icon">🔍</span>
+          <input type="text" placeholder="Search">
+          <button class="search-go">GO</button>
+        </div>
+        <button class="socialize-btn">Socialize</button>
+      </div>
+    </div>
+
+    <!-- Sub Navigation -->
+    <div class="sub-nav">
+      <a href="#">About</a>
+      <a href="#">Downloads</a>
+      <a href="#">Documentation</a>
+      <a href="#">Community</a>
+      <a href="#">Success Stories</a>
+      <a href="#">News</a>
+      <a href="#">Events</a>
+    </div>
+
+    <!-- Slideshow -->
+    <div class="hero-area">
+      <div class="slideshow">
+        <div class="slide-dots">
+          <a href="#" class="active">1</a>
+          <a href="#">2</a>
+          <a href="#">3</a>
+          <a href="#">4</a>
+          <a href="#">5</a>
+        </div>
+      </div>
+
+      <!-- Tagline -->
+      <div class="tagline">
+        Python is a programming language that lets you work quickly<br>
+        and integrate systems more effectively. <span class="arrows">&gt;&gt;&gt;</span> <a href="#">Learn More</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Content Sections -->
+<div class="content-sections">
+  <div class="content-inner">
+    <div class="content-card">
+      <h2><span class="icon">⏻</span> Get Started</h2>
+      <p>Whether you're new to programming or an experienced developer, it's easy to learn and use Python.</p>
+      <a href="#">Start with our Beginner's Guide</a>
+    </div>
+    <div class="content-card">
+      <h2><span class="icon">⬇</span> Download</h2>
+      <p>Python source code and installers are available for download for all versions!</p>
+      <p>Latest: <a href="#">Python 3.15.0</a></p>
+    </div>
+    <div class="content-card">
+      <h2><span class="icon">📖</span> Docs</h2>
+      <p>Documentation for Python's standard library, along with tutorials and guides, are available online.</p>
+      <a href="#">docs.python.org</a>
+    </div>
+    <div class="content-card">
+      <h2><span class="icon">💼</span> Jobs</h2>
+      <p>Looking for work or have a Python related position that you're trying to hire for? Our <strong>relaunched community-run job board</strong> is the place to go.</p>
+      <a href="#">jobs.python.org</a>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
+```

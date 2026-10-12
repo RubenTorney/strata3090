@@ -1,0 +1,458 @@
+```html
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nvidia — Wikipédia</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: #000;
+    font-family: sans-serif;
+    color: #202122;
+  }
+  .page {
+    background: #fff;
+    max-width: 1280px;
+    margin: 0 auto;
+    min-height: 100vh;
+    position: relative;
+  }
+
+  /* ---------- Header ---------- */
+  .site-header {
+    display: flex;
+    align-items: center;
+    padding: 10px 16px;
+    gap: 14px;
+  }
+  .hamburger {
+    font-size: 22px;
+    color: #202122;
+    cursor: pointer;
+    line-height: 1;
+    padding: 4px 6px;
+  }
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .globe {
+    width: 46px;
+    height: 46px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, #ffffff, #d8d8d8 55%, #b8b8b8 100%);
+    position: relative;
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+  .globe::before {
+    content: "W";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-family: "Linux Libertine", Georgia, serif;
+    font-size: 26px;
+    color: #333;
+  }
+  .globe::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background:
+      repeating-linear-gradient(0deg, transparent 0 10px, rgba(120,120,120,.25) 10px 11px),
+      repeating-linear-gradient(90deg, transparent 0 10px, rgba(120,120,120,.25) 10px 11px);
+  }
+  .logo-text { line-height: 1.1; }
+  .logo-text .wp {
+    font-family: "Linux Libertine", Georgia, serif;
+    font-size: 20px;
+    letter-spacing: .5px;
+  }
+  .logo-text .tag {
+    font-size: 12px;
+    color: #54595d;
+  }
+  .search {
+    flex: 1;
+    display: flex;
+    max-width: 460px;
+    margin-left: 10px;
+  }
+  .search input {
+    flex: 1;
+    border: 1px solid #a2a9b1;
+    border-right: none;
+    border-radius: 2px 0 0 2px;
+    padding: 7px 10px 7px 30px;
+    font-size: 13px;
+    background: #fff;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 20 20'><path fill='%2372777d' d='M12.9 14.3l-2.6-2.6a5 5 0 1 0-1.4 1.4l2.6 2.6 1.4-1.4zM8 12a4 4 0 1 1 0-8 4 4 0 0 1 0 8z'/></svg>");
+    background-repeat: no-repeat;
+    background-position: 8px center;
+  }
+  .search button {
+    border: 1px solid #a2a9b1;
+    background: #f8f9fa;
+    border-radius: 0 2px 2px 0;
+    padding: 0 14px;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  .top-links {
+    margin-left: auto;
+    display: flex;
+    gap: 14px;
+    font-size: 13px;
+    white-space: nowrap;
+  }
+  .top-links a { color: #3366cc; text-decoration: none; }
+  .top-links a:hover { text-decoration: underline; }
+
+  /* ---------- Layout ---------- */
+  .layout {
+    display: flex;
+    align-items: flex-start;
+    padding: 0 16px 40px;
+    gap: 24px;
+  }
+  .sidebar {
+    width: 178px;
+    flex-shrink: 0;
+    padding-top: 6px;
+  }
+  .sidebar h2 {
+    font-size: 14px;
+    font-weight: 700;
+    margin: 0 0 6px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .hide-btn {
+    font-size: 11px;
+    font-weight: 400;
+    background: #eaecf0;
+    border: none;
+    border-radius: 2px;
+    padding: 3px 8px;
+    cursor: pointer;
+    color: #202122;
+  }
+  .sidebar ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    border-top: 1px solid #c8ccd1;
+  }
+  .sidebar li { padding: 7px 0; }
+  .sidebar a {
+    color: #3366cc;
+    text-decoration: none;
+    font-size: 13px;
+    line-height: 1.35;
+  }
+  .sidebar a:hover { text-decoration: underline; }
+
+  .content { flex: 1; min-width: 0; }
+
+  /* ---------- Title row ---------- */
+  .title-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    border-bottom: 1px solid #a2a9b1;
+    padding-bottom: 4px;
+    margin-top: 10px;
+  }
+  .title-row h1 {
+    font-family: "Linux Libertine", Georgia, serif;
+    font-weight: 400;
+    font-size: 30px;
+    margin: 0;
+  }
+  .lang-link {
+    color: #3366cc;
+    font-size: 13px;
+    text-decoration: none;
+    white-space: nowrap;
+  }
+  .lang-link .globe-sm { color: #3366cc; }
+
+  /* ---------- Tabs ---------- */
+  .tabs-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 6px;
+  }
+  .tabs { display: flex; gap: 14px; }
+  .tabs a {
+    color: #3366cc;
+    text-decoration: none;
+    font-size: 13px;
+    padding: 6px 2px;
+  }
+  .tabs a.active {
+    color: #202122;
+    border-bottom: 3px solid #202122;
+  }
+  .tabs a:hover { text-decoration: underline; }
+  .tabs a.active:hover { text-decoration: none; }
+  .appearance { display: flex; align-items: center; gap: 8px; }
+  .appearance .lbl { font-size: 13px; font-weight: 700; }
+  .gear { color: #54595d; font-size: 16px; }
+
+  /* ---------- Coordinates ---------- */
+  .coords {
+    text-align: center;
+    color: #3366cc;
+    font-size: 13px;
+    margin: 14px 0 6px;
+  }
+  .coords .pin { color: #3366cc; }
+
+  /* ---------- Infobox ---------- */
+  .infobox {
+    float: right;
+    width: 268px;
+    margin: 0 0 16px 22px;
+    border: 1px solid #a2a9b1;
+    background: #f8f9fa;
+    font-size: 13px;
+  }
+  .ib-title {
+    background: #76b900;
+    color: #fff;
+    text-align: center;
+    font-size: 18px;
+    font-weight: 700;
+    padding: 12px 0;
+  }
+  .ib-logo {
+    text-align: center;
+    padding: 14px 0 6px;
+  }
+  .nvidia-mark {
+    display: inline-block;
+    width: 96px;
+    height: 60px;
+    background: #76b900;
+    position: relative;
+    border-radius: 2px;
+  }
+  .nvidia-mark::before {
+    content: "";
+    position: absolute;
+    top: 12px; left: 14px;
+    width: 68px; height: 36px;
+    background: #fff;
+    border-radius: 50%;
+    clip-path: polygon(0 50%, 22% 12%, 55% 0, 100% 30%, 78% 88%, 45% 100%, 0 50%);
+  }
+  .nvidia-mark::after {
+    content: "";
+    position: absolute;
+    top: 22px; left: 30px;
+    width: 36px; height: 16px;
+    background: #76b900;
+    border-radius: 50%;
+  }
+  .nvidia-word {
+    font-family: Arial, sans-serif;
+    font-weight: 800;
+    font-size: 26px;
+    letter-spacing: 1px;
+    color: #000;
+    margin-top: 6px;
+  }
+  .ib-caption { text-align: center; font-size: 12px; color: #202122; padding-bottom: 8px; }
+  .ib-photo {
+    width: 100%;
+    height: 150px;
+    background: linear-gradient(180deg, #7fb2e5 0%, #a9cdec 45%, #6f8f5a 45%, #4f6b3e 100%);
+    position: relative;
+    border-top: 1px solid #a2a9b1;
+    border-bottom: 1px solid #a2a9b1;
+  }
+  .ib-photo::before {
+    content: "";
+    position: absolute;
+    left: 0; right: 0; top: 40%;
+    height: 30%;
+    background: linear-gradient(180deg, #2b3a4a, #1c2733);
+    clip-path: polygon(0 100%, 0 40%, 30% 0, 70% 0, 100% 40%, 100% 100%);
+  }
+  .ib-photo::after {
+    content: "NVIDIA";
+    position: absolute;
+    right: 14px; bottom: 14px;
+    background: #fff;
+    color: #76b900;
+    font-weight: 800;
+    font-size: 11px;
+    padding: 3px 6px;
+    border-radius: 2px;
+  }
+  .ib-table { width: 100%; border-collapse: collapse; }
+  .ib-table tr { border-top: 1px solid #c8ccd1; }
+  .ib-table th {
+    text-align: left;
+    vertical-align: top;
+    padding: 8px 10px;
+    font-weight: 700;
+    width: 38%;
+    color: #202122;
+  }
+  .ib-table td {
+    padding: 8px 10px;
+    vertical-align: top;
+    line-height: 1.4;
+  }
+  .ib-table a { color: #3366cc; text-decoration: none; }
+  .ib-table a:hover { text-decoration: underline; }
+  .flag {
+    display: inline-block;
+    width: 16px; height: 11px;
+    background: linear-gradient(180deg, #b22234 0 6px, #fff 6px 7px, #b22234 7px 11px);
+    position: relative;
+    vertical-align: middle;
+    margin-right: 4px;
+  }
+  .flag::before {
+    content: "";
+    position: absolute;
+    top: 0; left: 0;
+    width: 7px; height: 6px;
+    background: #3c3b6e;
+  }
+
+  /* ---------- Article body ---------- */
+  .article p {
+    font-size: 14px;
+    line-height: 1.6;
+    margin: 0 0 14px;
+  }
+  .article a { color: #3366cc; text-decoration: none; }
+  .article a:hover { text-decoration: underline; }
+  .article b { font-weight: 700; }
+  sup { font-size: 10px; color: #3366cc; }
+  sup a { color: #3366cc; text-decoration: none; }
+
+  @media (max-width: 760px) {
+    .sidebar { display: none; }
+    .infobox { float: none; width: 100%; margin: 0 0 16px; }
+    .top-links { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- Header -->
+  <header class="site-header">
+    <div class="hamburger">&#9776;</div>
+    <div class="logo">
+      <div class="globe"></div>
+      <div class="logo-text">
+        <div class="wp">WIKIP&Eacute;DIA</div>
+        <div class="tag">L'encyclop&eacute;die libre</div>
+      </div>
+    </div>
+    <form class="search">
+      <input type="text" placeholder="Rechercher sur Wikip&eacute;dia">
+      <button type="submit">Rechercher</button>
+    </form>
+    <nav class="top-links">
+      <a href="#">Faire un don</a>
+      <a href="#">Cr&eacute;er un compte</a>
+      <a href="#">Se connecter</a>
+    </nav>
+  </header>
+
+  <!-- Layout -->
+  <div class="layout">
+
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <h2>Sommaire <button class="hide-btn">masquer</button></h2>
+      <ul>
+        <li><a href="#">D&eacute;but</a></li>
+        <li><a href="#">Historique de la soci&eacute;t&eacute;</a></li>
+        <li><a href="#">Produits</a></li>
+        <li><a href="#">Technologies</a></li>
+        <li><a href="#">Collaboration avec les fabricants de cartes graphiques</a></li>
+        <li><a href="#">&Eacute;v&eacute;nements marquants</a></li>
+        <li><a href="#">Notes et r&eacute;f&eacute;rences</a></li>
+        <li><a href="#">Voir aussi</a></li>
+      </ul>
+    </aside>
+
+    <!-- Content -->
+    <main class="content">
+
+      <div class="title-row">
+        <h1>Nvidia</h1>
+        <a class="lang-link" href="#"><span class="globe-sm">&#127760;</span> 77 langues &#9662;</a>
+      </div>
+
+      <div class="tabs-row">
+        <nav class="tabs">
+          <a href="#" class="active">Article</a>
+          <a href="#">Discussion</a>
+          <a href="#" class="active">Lire</a>
+          <a href="#">Modifier</a>
+          <a href="#">Modifier le code</a>
+          <a href="#">Voir l'historique</a>
+          <a href="#">&#8942;</a>
+        </nav>
+        <div class="appearance">
+          <span class="lbl">Apparence</span>
+          <button class="hide-btn">masquer</button>
+        </div>
+      </div>
+
+      <div class="coords"><span class="pin">&#128205;</span> 37&deg; 22' 14,62" N, 121&deg; 57' 49,46" O</div>
+
+      <!-- Infobox -->
+      <aside class="infobox">
+        <div class="ib-title">Nvidia</div>
+        <div class="ib-logo">
+          <div class="nvidia-mark"></div>
+          <div class="nvidia-word">NVIDIA.</div>
+        </div>
+        <div class="ib-caption">Logo de Nvidia.</div>
+        <div class="ib-photo"></div>
+        <table class="ib-table">
+          <tr><th>Cr&eacute;ation</th><td>5 avril 1993</td></tr>
+          <tr><th>Fondateurs</th><td>Jen-Hsun Huang (actuel PDG), Chris A. Malachowsky et Curtis Priem</td></tr>
+          <tr><th>Forme juridique</th><td>SA</td></tr>
+          <tr><th>Action</th><td><a href="#">NASDAQ&nbsp;: NVDA</a>, <a href="#">Dow Jones Industrial Average</a></td></tr>
+          <tr><th>Si&egrave;ge social</th><td><a href="#">Santa Clara</a><br><span class="flag"></span>&Eacute;tats-Unis</td></tr>
+          <tr><th>Direction</th><td>Jen-Hsun Huang (depuis 1993)&#8593;</td></tr>
+          <tr><th>Actionnaires</th><td><a href="#">BlackRock</a> (+7,43 pourcent (unit&eacute; non</td></tr>
+        </table>
+      </aside>
+
+      <!-- Article -->
+      <div class="article">
+        <p><b>Nvidia Corporation</b> est une soci&eacute;t&eacute; multinationale <a href="#">am&eacute;ricaine</a> de technologie bas&eacute;e &agrave; <a href="#">Santa Clara</a> et immatricul&eacute;e dans l'&Eacute;tat du <a href="#">Delaware</a>. Il s'agit d'un <a href="#">&eacute;diteur de logiciels</a> et d'une <a href="#">entreprise sans usine</a> qui con&ccedil;oit des <a href="#">processeurs graphiques</a> (GPU), des <a href="#">interfaces de programmation d'applications</a> (API) pour la <a href="#">science des donn&eacute;es</a> et le <a href="#">calcul intensif</a>, ainsi que des <a href="#">syst&egrave;mes sur une puce</a> (SoC) pour les march&eacute;s de l'<a href="#">informatique mobile</a> et de l'<a href="#">automobile</a>. Elle con&ccedil;oit ses <a href="#">circuits int&eacute;gr&eacute;s</a> dans ses centres de recherches, mais sous-traite leur production &agrave; d'autres soci&eacute;t&eacute;s de <a href="#">semi-conducteurs</a><sup><a href="#">15</a>, <a href="#">14</a></sup>.</p>
+
+        <p>&Agrave; l'origine ax&eacute;s sur les GPU pour le <a href="#">jeu vid&eacute;o</a>, Nvidia a &eacute;largi leur utilisation sur d'autres march&eacute;s, y compris l'<a href="#">intelligence artificielle</a> (IA), les <a href="#">centres de donn&eacute;es</a> et les <a href="#">supercalculateurs</a>. Les gammes de produits de la soci&eacute;t&eacute; comprennent les GPU GeForce pour les charges de travail de jeu et de cr&eacute;ation, et les GPU professionnels pour l'informatique de pointe, la recherche scientifique et les applications industrielles.</p>
+
+        <p>Ses principaux concurrents sont <a href="#">AMD</a> (anciennement <a href="#">ATI</a>)<sup><a href="#">13</a>, <a href="#">14</a></sup>, <a href="#">Intel</a> et <a href="#">Qualcomm</a><sup><a href="#">15</a>, <a href="#">16</a></sup>. Nvidia est toutefois un acteur <a href="#">dominant</a> dans le secteur du jeu vid&eacute;o ainsi que le mat&eacute;riel utilis&eacute; pour des projets d'<a href="#">intelligence artificielle</a><sup><a href="#">17</a>, <a href="#">18</a></sup>.</p>
+
+        <p>Le <a href="#">boom de l'intelligence artificielle</a> des <a href="#">ann&eacute;es 2020</a> fait</p>
+      </div>
+
+    </main>
+  </div>
+</div>
+</body>
+</html>
+```

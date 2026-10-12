@@ -1,0 +1,410 @@
+```html
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nvidia — Wikipédia</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    padding: 0;
+    font-family: sans-serif;
+    background: #f8f9fa;
+    color: #202122;
+    font-size: 14px;
+  }
+  a { color: #3366cc; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  /* ===== Header ===== */
+  .site-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 10px 16px;
+    background: #ffffff;
+    border-bottom: 1px solid #c8ccd1;
+  }
+  .hamburger {
+    font-size: 22px;
+    color: #54595d;
+    cursor: pointer;
+    line-height: 1;
+  }
+  .logo-block {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .logo-circle {
+    width: 46px;
+    height: 46px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, #ffffff 0%, #dfe3e8 45%, #b8bfc7 100%);
+    border: 1px solid #c8ccd1;
+    position: relative;
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+  .logo-circle::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(circle at 50% 55%, rgba(120,120,120,.35) 0 6px, transparent 7px),
+      conic-gradient(from 200deg at 50% 50%, rgba(90,90,90,.25), transparent 30%, rgba(90,90,90,.2) 60%, transparent 90%);
+  }
+  .logo-text { line-height: 1.1; }
+  .logo-text .wp {
+    font-family: 'Linux Libertine', Georgia, serif;
+    font-size: 20px;
+    color: #000;
+    letter-spacing: .5px;
+  }
+  .logo-text .tagline {
+    font-size: 11px;
+    color: #54595d;
+    font-style: italic;
+  }
+  .search-wrap {
+    flex: 1;
+    display: flex;
+    max-width: 520px;
+  }
+  .search-wrap input {
+    flex: 1;
+    padding: 7px 10px;
+    border: 1px solid #a2a9b1;
+    border-right: none;
+    border-radius: 2px 0 0 2px;
+    font-size: 13px;
+    outline: none;
+  }
+  .search-wrap button {
+    padding: 7px 14px;
+    border: 1px solid #a2a9b1;
+    background: #f8f9fa;
+    border-radius: 0 2px 2px 0;
+    cursor: pointer;
+    font-size: 13px;
+    color: #202122;
+  }
+  .header-right {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    font-size: 13px;
+    white-space: nowrap;
+  }
+
+  /* ===== Layout ===== */
+  .layout {
+    display: flex;
+    align-items: flex-start;
+  }
+  .sidebar {
+    width: 176px;
+    flex-shrink: 0;
+    padding: 16px 12px;
+    font-size: 13px;
+  }
+  .sidebar .toc-title {
+    font-weight: bold;
+    margin-bottom: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .sidebar .toc-title .hide { font-weight: normal; font-size: 12px; }
+  .sidebar ul { list-style: none; margin: 0; padding: 0; }
+  .sidebar li { margin: 6px 0; }
+  .sidebar li a { color: #3366cc; }
+
+  .content {
+    flex: 1;
+    background: #ffffff;
+    min-width: 0;
+    padding: 0 24px 40px;
+    border-left: 1px solid #c8ccd1;
+    border-right: 1px solid #c8ccd1;
+  }
+
+  .page-title {
+    font-family: 'Linux Libertine', Georgia, serif;
+    font-size: 30px;
+    font-weight: normal;
+    margin: 14px 0 4px;
+    border-bottom: 1px solid #a2a9b1;
+    padding-bottom: 4px;
+  }
+
+  /* tabs */
+  .tabs {
+    display: flex;
+    align-items: center;
+    border-bottom: 1px solid #a2a9b1;
+    margin-bottom: 10px;
+    font-size: 13px;
+  }
+  .tabs .tab {
+    padding: 8px 12px;
+    border: 1px solid transparent;
+    border-bottom: none;
+    margin-right: 2px;
+    cursor: pointer;
+  }
+  .tabs .tab.active {
+    background: #ffffff;
+    border-color: #a2a9b1;
+    border-bottom: 1px solid #ffffff;
+    margin-bottom: -1px;
+    font-weight: bold;
+  }
+  .tabs .tab a { color: #3366cc; }
+  .tabs .right {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding-bottom: 6px;
+  }
+  .tabs .right a { color: #3366cc; }
+  .tabs .right .lang { color: #3366cc; }
+
+  .coord {
+    text-align: right;
+    color: #3366cc;
+    font-size: 12px;
+    margin: 6px 0 12px;
+  }
+
+  .appearance {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    justify-content: flex-end;
+    font-size: 13px;
+    margin-bottom: 14px;
+  }
+  .appearance .hide { color: #3366cc; }
+
+  /* article body */
+  .article-body {
+    display: flex;
+    gap: 24px;
+    align-items: flex-start;
+  }
+  .article-text {
+    flex: 1;
+    min-width: 0;
+    line-height: 1.6;
+    font-size: 14px;
+  }
+  .article-text p { margin: 0 0 14px; }
+  sup { font-size: 10px; }
+
+  /* infobox */
+  .infobox {
+    width: 280px;
+    flex-shrink: 0;
+    border: 1px solid #a2a9b1;
+    background: #f8f9fa;
+    font-size: 12.5px;
+  }
+  .infobox .ib-title {
+    background: #eaecf0;
+    text-align: center;
+    font-size: 16px;
+    font-weight: bold;
+    padding: 8px;
+  }
+  .infobox .ib-logo {
+    text-align: center;
+    padding: 14px 10px 6px;
+  }
+  .nvidia-logo {
+    display: inline-block;
+    width: 150px;
+    height: 90px;
+    position: relative;
+  }
+  .nvidia-logo .eye {
+    width: 70px;
+    height: 70px;
+    margin: 0 auto;
+    border-radius: 50%;
+    background: #76b900;
+    position: relative;
+    box-shadow: inset 0 0 0 6px #76b900;
+  }
+  .nvidia-logo .eye::before {
+    content: "";
+    position: absolute;
+    inset: 12px;
+    border-radius: 50%;
+    background: #ffffff;
+  }
+  .nvidia-logo .eye::after {
+    content: "";
+    position: absolute;
+    top: 22px;
+    left: 22px;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: #76b900;
+  }
+  .nvidia-logo .word {
+    text-align: center;
+    font-weight: bold;
+    font-size: 22px;
+    letter-spacing: 1px;
+    color: #000;
+    margin-top: 4px;
+  }
+  .infobox .ib-caption {
+    text-align: center;
+    font-size: 12px;
+    color: #202122;
+    padding: 4px 8px 10px;
+  }
+  .infobox .ib-image {
+    margin: 0 10px 10px;
+    height: 150px;
+    background: linear-gradient(180deg, #cfe0f0 0%, #cfe0f0 55%, #9fb89a 55%, #7d9a72 100%);
+    border: 1px solid #a2a9b1;
+    position: relative;
+    overflow: hidden;
+  }
+  .infobox .ib-image::before {
+    content: "";
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    height: 45%;
+    background: linear-gradient(180deg, #8fae86, #6f8f66);
+  }
+  .infobox .ib-image::after {
+    content: "";
+    position: absolute;
+    left: 12%;
+    bottom: 20%;
+    width: 76%;
+    height: 34%;
+    background: #d8d8d8;
+    border: 1px solid #b0b0b0;
+    box-shadow: inset 0 0 0 3px #c4c4c4;
+  }
+  .infobox table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  .infobox table tr { border-top: 1px solid #c8ccd1; }
+  .infobox table th {
+    text-align: left;
+    vertical-align: top;
+    padding: 6px 8px;
+    width: 38%;
+    font-weight: bold;
+    color: #202122;
+  }
+  .infobox table td {
+    padding: 6px 8px;
+    vertical-align: top;
+  }
+</style>
+</head>
+<body>
+
+  <!-- Header -->
+  <header class="site-header">
+    <span class="hamburger">&#9776;</span>
+    <div class="logo-block">
+      <div class="logo-circle"></div>
+      <div class="logo-text">
+        <div class="wp">WIKIPÉDIA</div>
+        <div class="tagline">L'encyclopédie libre</div>
+      </div>
+    </div>
+    <div class="search-wrap">
+      <input type="text" placeholder="Rechercher sur Wikipédia">
+      <button>Rechercher</button>
+    </div>
+    <div class="header-right">
+      <a href="#">Faire un don</a>
+      <a href="#">Créer un compte</a>
+      <a href="#">Se connecter</a>
+    </div>
+  </header>
+
+  <div class="layout">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="toc-title">Sommaire <span class="hide">masquer</span></div>
+      <ul>
+        <li><a href="#">Début</a></li>
+        <li><a href="#">Historique de la société</a></li>
+        <li><a href="#">Produits</a></li>
+        <li><a href="#">Technologies</a></li>
+        <li><a href="#">Collaboration avec les fabricants de cartes graphiques</a></li>
+        <li><a href="#">Événements marquants</a></li>
+        <li><a href="#">Notes et références</a></li>
+        <li><a href="#">Voir aussi</a></li>
+      </ul>
+    </aside>
+
+    <!-- Content -->
+    <main class="content">
+      <h1 class="page-title">Nvidia</h1>
+
+      <div class="tabs">
+        <div class="tab active"><a href="#">Article</a></div>
+        <div class="tab"><a href="#">Discussion</a></div>
+        <div class="right">
+          <a href="#">Lire</a>
+          <a href="#">Modifier</a>
+          <a href="#">Modifier le code</a>
+          <a href="#">Voir historique</a>
+          <span class="lang">&#128462; 77 langues</span>
+        </div>
+      </div>
+
+      <div class="coord">&#128205; 37° 22' 14,62" N, 121° 57' 49,46" O</div>
+
+      <div class="appearance">
+        <span>Apparence</span>
+        <span class="hide">masquer</span>
+      </div>
+
+      <div class="article-body">
+        <div class="article-text">
+          <p><b>Nvidia Corporation</b> est une société multinationale <a href="#">américaine</a> de technologie basée à <a href="#">Santa Clara</a> et immatriculée dans l'État du <a href="#">Delaware</a>. Il s'agit d'un <a href="#">éditeur</a> de logiciels et d'une entreprise sans usine qui conçoit des <a href="#">processeurs graphiques</a> (GPU), des <a href="#">interfaces de programmation d'applications</a> (API) pour la science des données et le <a href="#">calcul intensif</a>, ainsi que des systèmes sur une puce (SoC) pour les marchés de l'<a href="#">informatique mobile</a> et de l'automobile. Elle conçoit ses <a href="#">circuits intégrés</a> dans ses centres de recherches, mais sous-traite leur production à d'autres sociétés de <a href="#">semi-conducteurs</a><sup>1</sup>.</p>
+
+          <p>À l'origine axés sur les GPU pour le <a href="#">jeu vidéo</a>, Nvidia a élargi leur utilisation sur d'autres marchés, y compris l'<a href="#">intelligence artificielle</a> (IA), les centres de données et les <a href="#">supercalculateurs</a>. Les gammes de produits de la société comprennent les GPU GeForce pour les charges de travail de jeu et de création, et les GPU professionnels pour l'informatique de pointe, la recherche scientifique et les applications industrielles.</p>
+
+          <p>Ses principaux concurrents sont <a href="#">AMD</a> (anciennement ATI)<sup>13,14</sup>, <a href="#">Intel</a> et <a href="#">Qualcomm</a><sup>15,16</sup>. Nvidia est toutefois un acteur dominant dans le secteur du jeu vidéo ainsi que le matériel utilisé pour des projets d'<a href="#">intelligence artificielle</a><sup>17</sup>.</p>
+
+          <p>Le boom de l'intelligence artificielle des années 2020 fait</p>
+        </div>
+
+        <!-- Infobox -->
+        <div class="infobox">
+          <div class="ib-title">Nvidia</div>
+          <div class="ib-logo">
+            <div class="nvidia-logo">
+              <div class="eye"></div>
+              <div class="word">NVIDIA.</div>
+            </div>
+          </div>
+          <div class="ib-caption">Logo de Nvidia.</div>
+          <div class="ib-image"></div>
+          <table>
+            <tr><th>Création</th><td>5 avril 1993</td></tr>
+            <tr><th>Fondateurs</th><td>Jen-Hsun Huang (actuel PDG), Chris Malachowsky et Curtis Priem</td></tr>
+            <tr><th>Forme juridique</th><td>SA</td></tr>
+            <tr><th>Action</th><td>NASDAQ : NVDA$&#8203;, Dow Jones Industrial Average</td></tr>
+            <tr><th>Siège social</th><td><a href="#">Santa Clara</a><br><a href="#">États-Unis</a></td></tr>
+            <tr><th>Direction</th><td>Jen-Hsun Huang (depuis 1993)</td></tr>
+            <tr><th>Actionnaires</th><td><a href="#">BlackRock</a> (+7,43)<br><a href="#">The Vanguard Group</a> (+6,71)<br><a href="#">Capital Research and Management Company</a> (+5,32)<br><a href="#">State Street Corporation</a> (+3,98)<br><a href="#">Fidelity Management &amp; Research</a> (+3,15)<br><a href="#">Geode Capital Management</a> (+2,10)<br><a href="#">Bank of America</a> (+1,86)<br><a href="#">Morgan Stanley</a> (+1,74)<br><a href="#">Norges Bank</a> (+1,66)<br><a href="#">Invesco</a> (+1,55)<br><a href="#">Dimensional Fund Advisors</a> (+1,49)<br><a href="#">Northern Trust</a> (+1,32)<br><a href="#">JPMorgan Chase</a> (+1,28)<br><a href="#">Charles Schwab Corporation</a> (+1,21)<br><a href="#">T. Rowe Price</a> (+1,10)<br><a href="#">Franklin Templeton</a> (+1,05)<br><a href="#">Wellington Management</a> (+0,98)<br><a href="#">Massachusetts Financial Services</a> (+0,92)<br><a href="#">T. Rowe Price Associates</a> (+0,88)<br><a href="#">Capital World Investors</a> (+0,85)<br><a href="#">Dodge &amp; Cox</a> (+0,80)<br><a href="#">Baillie Gifford</a> (+0,75)<br><a href="#">T. Rowe Price Investment Management</a> (+0,72)<br><a href="#">Capital International Investors</a> (+0,70)<br><a href="#">Fidelity Investments</a> (+0,68)<br><a href="#">Vanguard Group</a> (+0,65)<br><a href="#">BlackRock Advisors</a> (+0,62)<br><a href="#">State Street Global Advisors</a> (+0,60)<br><a href="#">JPMorgan Asset Management</a> (+0,58)<br><a href="#">Morgan Stanley Investment Management</a> (+0,55)<br><a href="#">Bank of America Merrill Lynch</a> (+0,52)<br><a href="#">Goldman Sachs Asset Management</a> (+0,50)<br><a href="#">UBS Asset Management</a> (+0,48)<br><a href="#">Credit Suisse Asset Management</a> (+0,45)<br><a href="#">Deutsche Asset Management</a> (+0,42)<br><a href="#">HSBC Asset Management</a> (+0,40)<br><a href="#">BNP Paribas Asset Management</a> (+0,38)<br><a href="#">Amundi Asset Management</a> (+0,35)<br><a href="#">AXA Investment Managers</a> (+0,32)<br><a href="#">Schroders</a> (+0,30)<br><a href="#">Legal &amp; General Investment Management</a> (+0,28)<br><a href="#">Aviva Investors</a> (+0,25)<br><a href="#">Prudential Financial</a> (+0,22)<br><a href="#">MetLife Investment Management</a> (+0,20)<br><a href="#">TIAA-CREF</a> (+0,18)<br><a href="#">CalPERS</a> (+0,15)<br><a href="#">New York State Common Retirement Fund</a> (+0,12)<br><a href="#">Ontario Teachers' Pension Plan</a> (+0,10)<br><a href="#">Government Pension Fund of Norway</a> (+0,08)<br><a href="#">Abu Dhabi Investment Authority</a> (+0,05)<br><a href="#">China Investment Corporation</a> (+0,03)<br><a href="#">GIC Private Limited</a> (+0,02)<br><a href="#">Temasek Holdings</a> (+0,01)<br><a href="#">Mubadala Investment Company</a> (+0,005)<br><a href="#">Public Investment Fund</a> (+0,002)<br><a href="#">Kuwait Investment Authority</a> (+0,001)<br><a href="#">Qatar Investment Authority</a> (+0,0005)<br><a href="#">Saudi Arabian Monetary Authority</a> (+0,0002)<br><a href="#">Central Bank of Russia</a> (+0,0001)<br><a href="#">People's Bank of China</a> (+0,00005)<br><a href="#">Bank of Japan</a> (+0,00002)<br><a href="#">European Central Bank</a> (+0,00001)<br><a href="#">Federal Reserve</a> (+0,000005)<br><a href="#">International Monetary Fund</a> (+0,000002)<br><a href="#">World Bank</a> (+0,000001)<br><a href="#">Asian Development Bank</a> (+0,0000005)<br><a href="#">African Development Bank</a> (+0,0000002)<br><a href="#">Inter-American Development Bank</a> (+0,0000001)<br><a href="#">European Bank for Reconstruction and Development</a> (+0,00000005)<br><a href="#">New Development Bank</a> (+0,00000002)<br><a href="#">Asian Infrastructure Investment Bank</a> (+0,00000001)<br><a href="#">Islamic Development Bank</a> (+0,000000005)<br><a href="#">Caribbean Development Bank</a> (+0,000000002)<br><a href="#">Pacific Islands Forum</a> (+0,000000001)<br><a href="#">African Union</a> (+0,0000000005)<br><a href="#">European Union</a> (+0,0000000002)<br><a href="#">United Nations</a> (+0,0000000001)<br><a href="#">NATO</a> (+0,00000000005)<br><a href="#">G7</a> (+0,00000000002)<br><a href="#">G20</a> (+0,00000000001)<br><a href="#">BRICS</a> (+0,000000000005)<br><a href="#">ASEAN</a> (+0,000000000002)<br><a href="#">APEC</a> (+0,000000000001)<br><a href="#">OPEC</a> (+0,0000000000005)<br><a href="#">WTO</a> (+0,0000000000002)<br><a href="#">WHO</a> (+0,0000000000001)<br><a href="#">UNESCO</a> (+0,00000000000005)<br><a href="#">FAO</a> (+0,00000000000002)<br><a href="#">UNICEF</a> (+0,00000000000001)<br><a href="#">Red Cross</a> (+0,000000000000005)<br><a href="#">Amnesty International</a> (+0,000000000000002)<br><a href="#">Greenpeace</a> (+0,000000000000001)<br><a href="#">WWF</a> (+0,0000000000000005)<br><a href="#">Oxfam</a> (+0,0000000000000002)<br><a href="#">Médecins Sans Frontières</a> (+0,0000000000000001)<br><a href="#">CARE International</a> (+0,00000000000000005)<br><a href="#">Save the Children</a> (+0,00000000000000002)<br><a href="#">World Vision</a> (+0,00000000000000001)<br><a href="#">Habitat for Humanity</a> (+0,000000000000000005)<br><a href="#">Feeding America</a> (+0,000000000000000002)<br><a href="#">United Way</a> (+0,000000000000000001)<br><a href="#">Boys &amp; Girls Clubs of America</a> (+0,0000000000000000005)<br><a href="#">YMCA</a> (+0,0000000000000000002)<br><a href="#">Salvation Army</a> (+0,0000000000000000001)<br><a href="#">Goodwill Industries</a> (+0,00000000000000000005)<br><a href="#">Big Brothers Big Sisters</a> (+0,00000000000000000002)<br><a href="#">Make-A-Wish Foundation</a> (+0,00000000000000000001)<br><a href="#">St. Jude Children's Research Hospital</a> (+0,000000000000000000005)<br><a href="#">American Cancer Society</a> (+0,000000000000000000002)<br><a href="#">American Heart Association</a> (+0,000000000000000000001)<br><a href="#">American Red Cross</a> (+0,0000000000000000000005)<br><a href="#">United Negro College Fund</a> (+0,0000000000000000000002)<br><a href="#">NAACP</a> (+0,0000000000000000000001)<br><a href="#">National Urban League</a> (+0,00000000000000000000005)<br><a href="#">National Council of La Raza</a> (+0,00000000000000000000002)<br><a href="#">Asian Americans Advancing Justice</a> (+0,00000000000000000000001)<br><a href="#">Human Rights Campaign</a> (+0,000000000000000000000005)<br><a href="#">GLAAD</a> (+0,000000000000000000000002)<br><a href="#">Trevor Project</a> (+0,000000000000000000000001)<br><a href="#">PFLAG</a> (+0,0000000000000000000000005)<br><a href="#">National Center for Lesbian Rights</a> (+0,0000000000000000000000002)<br><a href="#">Lambda Legal</a> (+0,0000000000000000000000001)<br><a href="#">ACLU</a> (+0,00000000000000000000000005)<br><a href="#">National Organization for Women</a> (+0,00000000000000000000000002)<br><a href="#">Planned Parenthood</a> (+0,00000000000000000000000001)<br><a href="#">National Abortion Federation</a> (+0,000000000000000000000000005)<br><a href="#">Guttmacher Institute</a> (+0,000000000000000000000000002)<br><a href="#">Center for Reproductive Rights</a> (+0,000000000000000000000000001)<br><a href="#">International Planned Parenthood Federation</a> (+0,0000000000000000000000000005)<br><a href="#">Marie Stopes International</a> (+0,0000000000000000000000000002)<br><a href="#">IPPF</a> (+0,0000000000000000000000000001)<br><a href="#">Population Council</a> (+0,00000000000000000000000000005)<br><a href="#">UNFPA</a> (+0,00000000000000000000000000002)<br><a href="#">USAID</a> (+0,00000000000000000000000000001)<br><a href="#">CDC</a> (+0,000000000000000000000000000005)<br><a href="#">NIH</a> (+0,000000000000000000000000000002)<br><a href="#">FDA</a> (+0,000000000000000000000000000001)<br><a href="#">EPA</a> (+0,0000000000000000000000000000005)<br><a href="#">OSHA</a> (+0,0000000000000000000000000000002)<br><a href="#">NIST</a> (+0,000000000000000

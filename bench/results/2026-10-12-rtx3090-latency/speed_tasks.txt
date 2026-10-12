@@ -1,0 +1,27 @@
+WARNING: --no-deterministic: nothing is pinned; hashes may differ run to run
+WARNING: --rounds 1 is not a multiple of the 3 arms: the arm order is not balanced
+[ref_r0] start, free RAM 59.7 GB
+[ref_r0] up after 27 s
+  round 0 ref: median 121.0 tok/s over 12 prompts
+[pt36_r0] start, free RAM 59.8 GB
+[pt36_r0] up after 27 s
+  round 0 pt36: median 122.8 tok/s over 12 prompts
+[pt12_r0] start, free RAM 59.7 GB
+[pt12_r0] up after 27 s
+  round 0 pt12: median 122.8 tok/s over 12 prompts
+ref: median 121.0 tok/s over all 12 prompts (not paired)
+pt36: median 122.8 tok/s over all 12 prompts (not paired)
+pt12: median 122.8 tok/s over all 12 prompts (not paired)
+
+pt36 vs ref: paired ratio median 1.011, prompts faster 2/2
+  WARNING: only 2/12 prompts are comparable: a ratio over a minority is not the arm's speed
+  text diverged (excluded): prompts [0, 1, 2, 3, 4, 6, 7, 8, 10, 11] - the arms did different work there. Excluding them selects the prompts where the change did not alter the text, which can bias the ratio
+    prompt  5: 1.009
+    prompt  9: 1.013
+
+pt12 vs ref: paired ratio median 1.011, prompts faster 2/2
+  WARNING: only 2/12 prompts are comparable: a ratio over a minority is not the arm's speed
+  text diverged (excluded): prompts [0, 1, 2, 3, 4, 6, 7, 8, 10, 11] - the arms did different work there. Excluding them selects the prompts where the change did not alter the text, which can bias the ratio
+    prompt  5: 1.009
+    prompt  9: 1.012
+DRIVER EXIT 1

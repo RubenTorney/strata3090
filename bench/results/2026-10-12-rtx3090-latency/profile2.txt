@@ -1,0 +1,16 @@
+WARNING: --no-deterministic: nothing is pinned; hashes may differ run to run
+WARNING: --rounds 1 is not a multiple of the 2 arms: the arm order is not balanced
+[stamps_r0] start, free RAM 59.6 GB
+[stamps_r0] up after 27 s
+  round 0 stamps: median 118.0 tok/s over 4 prompts
+[stampsgpu_r0] start, free RAM 59.7 GB
+[stampsgpu_r0] up after 27 s
+  round 0 stampsgpu: median 108.4 tok/s over 4 prompts
+stamps: median 118.0 tok/s over all 4 prompts (not paired)
+stampsgpu: median 108.4 tok/s over all 4 prompts (not paired)
+
+stampsgpu vs stamps: paired ratio median 0.932, prompts faster 0/1
+  WARNING: only 1/4 prompts are comparable: a ratio over a minority is not the arm's speed
+  text diverged (excluded): prompts [1, 2, 3] - the arms did different work there. Excluding them selects the prompts where the change did not alter the text, which can bias the ratio
+    prompt  0: 0.932
+DRIVER EXIT 1

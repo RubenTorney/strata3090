@@ -1,0 +1,17 @@
+WARNING: --no-deterministic: nothing is pinned; hashes may differ run to run
+WARNING: --rounds 1 is not a multiple of the 2 arms: the arm order is not balanced
+[prof_r0] start, free RAM 59.5 GB
+[prof_r0] up after 27 s
+  round 0 prof: median 118.4 tok/s over 4 prompts
+[profgpu_r0] start, free RAM 59.8 GB
+[profgpu_r0] up after 27 s
+  round 0 profgpu: median 118.1 tok/s over 4 prompts
+prof: median 118.4 tok/s over all 4 prompts (not paired)
+profgpu: median 118.1 tok/s over all 4 prompts (not paired)
+
+profgpu vs prof: paired ratio median 0.997, prompts faster 1/4
+    prompt  0: 1.019
+    prompt  1: 0.991
+    prompt  2: 0.997
+    prompt  3: 0.997
+DRIVER EXIT 0

@@ -1,0 +1,22 @@
+  fix engine 0: 933ac2 fcfe34 25bdb8 704fef 0ed54c 806d15 dc5b92 b82d90 3381b4 b11edc 09e1f2 acd6f8
+  fix engine 1: 933ac2 fcfe34 25bdb8 704fef 0ed54c 806d15 dc5b92 b82d90 3381b4 b11edc 09e1f2 acd6f8
+fix: self-consistent over 2 engines (12/12 prompts)
+  fix_vr900 engine 0: 05d88d 700f7b 54352e 4d44c5 a4bd1b ca00d7 839bac a15606 3381b4 7e316c e71c8c acd6f8
+  fix_vr900 engine 1: 05d88d 700f7b 54352e 4d44c5 a4bd1b ca00d7 839bac a15606 3381b4 7e316c e71c8c acd6f8
+fix_vr900: self-consistent over 2 engines (12/12 prompts)
+fix_vr900 vs fix: the same text over the same token count on 2/12 prompts; differ: [0, 1, 2, 3, 4, 5, 6, 7, 9, 10]
+  fix_vr1100 engine 0: 119493 98600c 2c2a43 4ce874 a0c128 f125e1 b40c99 0a0775 d93929 7e316c d212e2 d495a5
+  fix_vr1100 engine 1: 119493 98600c 2c2a43 4ce874 a0c128 f125e1 b40c99 0a0775 d93929 7e316c d212e2 d495a5
+fix_vr1100: self-consistent over 2 engines (12/12 prompts)
+fix_vr1100 vs fix: the same text over the same token count on 0/12 prompts; differ: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+  pin engine 0: b71467 98600c 25bdb8 a5fb34 e2143c e1d880 d9766c 509d71 3381b4 93f915 3be69a d495a5
+  pin engine 1: b71467 98600c 25bdb8 a5fb34 e2143c e1d880 d9766c 509d71 3381b4 93f915 3be69a d495a5
+pin: self-consistent over 2 engines (12/12 prompts)
+  pin_vr900 engine 0: b71467 98600c 25bdb8 a5fb34 e2143c e1d880 d9766c 509d71 3381b4 93f915 3be69a d495a5
+  pin_vr900 engine 1: b71467 98600c 25bdb8 a5fb34 e2143c e1d880 d9766c 509d71 3381b4 93f915 3be69a d495a5
+pin_vr900: self-consistent over 2 engines (12/12 prompts)
+pin_vr900 vs pin: the same text over the same token count on 12/12 prompts
+  pin_vr1100 engine 0: b71467 98600c 25bdb8 a5fb34 e2143c e1d880 d9766c 509d71 3381b4 93f915 3be69a d495a5
+  pin_vr1100 engine 1: b71467 98600c 25bdb8 a5fb34 e2143c e1d880 d9766c 509d71 3381b4 93f915 3be69a d495a5
+pin_vr1100: self-consistent over 2 engines (12/12 prompts)
+pin_vr1100 vs pin: the same text over the same token count on 12/12 prompts

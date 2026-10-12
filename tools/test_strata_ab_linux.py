@@ -204,5 +204,11 @@ class Processes(unittest.TestCase):
         self.assertIn("parity", out.stdout)
 
 
+class CacheMismatch(unittest.TestCase):
+    def test_sizes(self):
+        self.assertEqual(ab.cache_mismatch([{"expert_cache": 8687}, {"expert_cache": 8688}, {"expert_cache": 8688}]), [8687, 8688])
+        self.assertEqual(ab.cache_mismatch([{"expert_cache": 6793}, {"expert_cache": 6793}, {}]), [])
+
+
 if __name__ == "__main__":
     unittest.main()

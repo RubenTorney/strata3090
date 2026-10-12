@@ -115,6 +115,14 @@ def pin_mismatch(startups: list[dict]) -> bool:
     return len({tuple(s.get("pin", [])) for s in startups}) > 1
 
 
+def cache_mismatch(startups: list[dict]) -> list[int]:
+    """The distinct expert-cache slot counts the engines opened, when there is more than one.  A cache asked close to what
+    fits is shrunk from the free VRAM at start, whatever --expert-cache says (RTX 3090: 8,687 / 8,688 / 8,703 slots in three
+    groups of engines gave three sets of answers); a smaller --cache-slots holds (5,200 held under three reserves)."""
+    sizes = sorted({s["expert_cache"] for s in startups if "expert_cache" in s})
+    return sizes if len(sizes) > 1 else []
+
+
 def median(xs: list[float]) -> float:
     return statistics.median(xs) if xs else float("nan")
 
@@ -262,6 +270,7 @@ def det_bundle(cache_slots: int | None, prefill_chunk: int | None, pcie_frac: st
         env["STRATA_DETERMINISTIC"] = "1"
         env["STRATA_ROUTE_TAIL_SKIP"] = tail_skip
         env["STRATA_PREFILL_CPU_SHARE"] = "0"       # unset = auto below 1024 tokens (timed means)
+        env["STRATA_KV_GROW"] = "0"                 # the elastic K/V sizes the cache from the free VRAM whatever --expert-cache says
         args["--suffix-draft"] = "0"
         args["--lookup-chain"] = "0"
     if cache_slots:
@@ -556,7 +565,7 @@ def cmd_probe(ctx) -> int:
     s["free_vram_mib"] = vram
     (Path(ctx.workdir) / "probe.json").write_text(json.dumps(s), encoding="utf-8")
     print(json.dumps(s))
-    print("pin them with: --cache-slots %s --prefill-chunk %s   (take a little less if the desktop's VRAM use varies)"
+    print("pin them with: --cache-slots %s --prefill-chunk %s   (take about a fifth less for --cache-slots: a cache close to what fits is shrunk from the free VRAM at start)"
           % (s.get("expert_cache", "?"), s.get("prefill_chunk", "?")))
     return 0
 
@@ -587,6 +596,9 @@ def cmd_parity(ctx) -> int:
             print(f"{arm['name']}: self-consistent over {ctx.engines} engines ({len(prompts)}/{len(prompts)} prompts)", flush=True)
         if pin_mismatch(pins):
             print("WARNING: the engines' arena registration lines differ (pinned bytes): " + str(pins), flush=True)
+        if cache_mismatch(pins):
+            print("WARNING: the engines opened expert caches of different sizes (slots %s): the cache followed the free VRAM; give "
+                  "a smaller --cache-slots" % cache_mismatch(pins), flush=True)
         if ref is None:
             ref, ref_name = runs[0], arm["name"]
             continue
@@ -615,6 +627,9 @@ def cmd_speed(ctx) -> int:
             print(f"  round {rnd} {arm['name']}: median {median(tps):.1f} tok/s over {len(tps)} prompts", flush=True)
     if pin_mismatch(pins):
         print("WARNING: the engines' arena registration lines differ (pinned bytes): " + str(pins), flush=True)
+    if cache_mismatch(pins):
+        print("WARNING: the engines opened expert caches of different sizes (slots %s): the cache followed the free VRAM; give a "
+              "smaller --cache-slots" % cache_mismatch(pins), flush=True)
     merged = {n: {i: merge_hash(v) for i, v in d.items()} for n, d in reps.items()}
     for a in arms:
         allv = [median(m["tps"]) for m in merged[a["name"]].values() if m["tps"]]

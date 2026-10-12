@@ -2295,6 +2295,14 @@ int main(int argc, char** argv) {
         if (o.expert_cache < 0 || (o.expert_cache == 0 && !o.expert_profile.empty()))   // (0 with a profile means auto)
             std::fprintf(stderr, "strata: STRATA_DETERMINISTIC=1 WARNING: the expert cache is sized from the free VRAM at start "
                                  "(--expert-cache auto); give --expert-cache N for the same cache in every run\n");
+        {   // the elastic K/V takes the cache's size from the VRAM left at start, whatever --expert-cache says (measured on an
+            // RTX 3090: 8,687 / 8,688 / 8,703 slots in three groups of engines, and three different sets of answers)
+            const char* ev = std::getenv("STRATA_KV_GROW");
+            if (ev != nullptr && ev[0] != '\0' ? ev[0] != '0' : o.kv_grow)
+                std::fprintf(stderr, "strata: STRATA_DETERMINISTIC=1 WARNING: --kv-grow sizes the expert cache from the free VRAM at "
+                                     "start even with --expert-cache N; set STRATA_KV_GROW=0 (or --no-kv-grow) for the same cache "
+                                     "in every run\n");
+        }
         if (o.prefill_auto)
             std::fprintf(stderr, "strata: STRATA_DETERMINISTIC=1 WARNING: --prefill auto picks the chunk from the free VRAM; give "
                                  "--prefill N for the same chunks in every run\n");

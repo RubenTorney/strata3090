@@ -37,6 +37,7 @@
 #include <condition_variable>
 #include <cstdint>
 #include <mutex>
+#include <string>
 #include <thread>
 #include <vector>
 
@@ -187,6 +188,11 @@ public:
     /// run_split_multi's phases, accumulated ms: gate/up rows, the intermediate quantization, down rows.
     double ms_multi_gu = 0, ms_multi_q = 0, ms_multi_down = 0;
     int64_t multi_bytes = 0;
+    /// STRATA_POOL_STAMPS=1 (measurement only, strata3090): where a row phase's wall time goes, summed since the last
+    /// call and then reset - the park wait before it, publish to the first claim (the wake-up), publish to the last
+    /// `done` (the rows), the host's own drain, the last `done` to the host seeing it, and the re-park after; plus
+    /// how many threads took a task.  Empty when the switch is off.
+    std::string stamps_report();
 
     /// Total `_mm_pause` iterations spent waiting, over all workers, is no longer counted - see the note on the
     /// atomics below.  It was a LOCKED read-modify-write in the park loop, so measuring the contention added to
@@ -298,6 +304,15 @@ private:
     std::vector<SplitBufMulti> split_multi_;
     PoolAffinity affinity_ = PoolAffinity::All;
     CpuTopology topo_;
+    // STRATA_POOL_STAMPS: per thread (index n_ = the host) the steady_clock ns of its first claim and last `done` of
+    // the current phase; sums per phase kind (0: gate/up, 1: down) - see stamps_report
+    bool stamps_ = false;
+    std::unique_ptr<std::atomic<int64_t>[]> st_first_, st_last_;
+    std::unique_ptr<std::atomic<int32_t>[]> st_tasks_;
+    struct StampSum {
+        double park = 0, wake = 0, work = 0, mean_done = 0, host = 0, seen = 0, repark = 0;
+        int64_t phases = 0, sleepers = 0, threads = 0, tasks = 0, host_tasks = 0;
+    } st_sum_[2];
 };
 
 }  // namespace strata::kernels::cpu

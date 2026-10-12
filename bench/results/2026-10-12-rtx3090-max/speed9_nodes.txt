@@ -1,0 +1,3 @@
+  round 0 ref: median 122.5 tok/s over 12 prompts
+  round 0 dummy10: median 120.8 tok/s over 12 prompts
+  round 0 dummy40: median 115.7 tok/s over 12 prompts

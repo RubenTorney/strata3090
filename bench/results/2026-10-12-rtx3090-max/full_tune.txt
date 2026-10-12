@@ -1,0 +1,3 @@
+  round 0 ref: median 93.0 tok/s over 1 prompts
+  round 0 k8v4: median 91.6 tok/s over 1 prompts
+  round 0 q4: median 89.4 tok/s over 1 prompts

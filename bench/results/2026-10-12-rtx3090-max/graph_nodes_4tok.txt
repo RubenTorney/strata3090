@@ -1,0 +1,23 @@
+strata verify: the 4-token window graph has 2158 nodes: 145 x _ZN6strata7kernels47_GLOBAL__N__1d80a14f_14_native_mmvq_cu_3; 144 x _ZN6strata7kernels50
+strata verify: 2347 edges, 0 programmatic (PDL), 0 of them not kernel to kernel
+strata verify: captured the 4-token window (upload no error, sync no error)
+strata verify: capturing the 3-token window (391 MiB of VRAM free)
+strata verify: the 3-token window graph has 2150 nodes: 145 x _ZN6strata7kernels47_GLOBAL__N__1d80a14f_14_native_mmvq_cu_3; 144 x _ZN6strata7kernels50
+strata verify: 2339 edges, 0 programmatic (PDL), 0 of them not kernel to kernel
+strata verify: captured the 3-token window (upload no error, sync no error)
+strata serve: prompt 21 tokens = 0 reused + 21 read in 271 ms (77.4 tok/s), 31 generated in 414 ms (74.8 tok/s), drafts accepted 17 of 23, 1 checkpoin
+strata serve: decode expert cache hit rate: 80.8% (13078 hits / 16181 lookups); 769 more read by the GPU over PCIe or from another GPU (4.5% of all 16
+strata serve: route tail skip: 2433 missed experts skipped (2678 entries) since the start
+strata serve: asynchronous adaptive tier: 16 rounds, 1437 experts swapped in, 23.9 ms per round (start to flip, between windows) (arena, copy-in only,
+strata serve: prompt 19 tokens = 0 reused + 19 read in 182 ms (104.1 tok/s), 3 generated in 50 ms (59.5 tok/s), drafts accepted 3 of 3, 1 checkpoints
+strata serve: decode expert cache hit rate: 82.8% (1698 hits / 2050 lookups); 108 more read by the GPU over PCIe or from another GPU (5.0% of all 2158
+strata serve: route tail skip: 3283 missed experts skipped (3587 entries) since the start
+strata serve: asynchronous adaptive tier: 18 rounds, 1651 experts swapped in, 24.0 ms per round (start to flip, between windows) (arena, copy-in only,
+strata serve: prompt 26 tokens = 0 reused + 26 read in 239 ms (108.6 tok/s), 64 generated in 609 ms (105.0 tok/s), drafts accepted 31 of 41, 1 checkpo
+strata serve: decode expert cache hit rate: 91.1% (29682 hits / 32572 lookups); 541 more read by the GPU over PCIe or from another GPU (1.6% of all 33
+strata serve: route tail skip: 6316 missed experts skipped (6851 entries) since the start
+strata serve: asynchronous adaptive tier: 51 rounds, 4065 experts swapped in, 20.7 ms per round (start to flip, between windows) (arena, copy-in only,
+strata verify: capturing the 5-token window (373 MiB of VRAM free)
+strata verify: the 5-token window graph has 2109 nodes: 145 x _ZN6strata7kernels47_GLOBAL__N__1d80a14f_14_native_mmvq_cu_3; 144 x _ZN6strata7kernels50
+strata verify: 2298 edges, 0 programmatic (PDL), 0 of them not kernel to kernel
+strata verify: captured the 5-token window (upload no error, sync no error)

@@ -1,9 +1,21 @@
-> **strata3090** : une branche de Strata réglée et mesurée pour une RTX 3090 24 Go (Linux, Ryzen 5 5600X, Qwen3.8-Flash-Next
-> IQ3_S, contexte 262 144). Configuration, mesures et mode vision : **[docs/RTX3090.md](docs/RTX3090.md)**.
+> **strata3090** : une branche de Strata réglée et mesurée pour une RTX 3090 24 Go (Linux, Ryzen 5 5600X, 62 Gio de RAM,
+> Qwen3.8-Flash-Next IQ3_S, contexte 262 144). Configuration, mesures et mode vision : **[docs/RTX3090.md](docs/RTX3090.md)**.
+>
+> | Mesure (12 et 13 octobre 2026) | Résultat |
+> | --- | --- |
+> | Génération, contexte court (médiane de 12 prompts, dix mesures) | 121,0 à 123,7 tok/s (base v0.1.43 : 117,0 ; installation d'origine : 94,5) |
+> | Génération, contexte plein (prompt de 257 886 jetons, trois passes) | 93,0 / 90,2 / 91,5 tok/s |
+> | Lecture d'un prompt de 213K jetons | 2 250 tok/s environ |
+> | Réponse de 2 500 tokens d'affilée | 124,8 tok/s |
+> | Vision : capture d'écran refaite en un fichier HTML (3 pages, 1 024 jetons d'image) | pages complètes et fidèles au texte, 139,7 à 147,6 tok/s, 13,3 s d'encodage sur le CPU |
 >
 > ![Débit à contexte court](docs/img/short_context.png)
 > ![Débit selon le remplissage du contexte](docs/img/long_context.png)
 > ![Mode vision](docs/img/vision.png)
+>
+> Le mode vision reproduit la mise en page et le texte d'une capture de Hacker News, d'un article de Wikipédia et de
+> l'accueil de python.org ; les images d'origine sont remplacées par des formes simples. Détail, limites et fichiers
+> produits : [docs/RTX3090.md](docs/RTX3090.md#mode-vision), `bench/vision/`.
 
 <h1 align="center">Strata</h1>
 

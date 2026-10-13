@@ -2,7 +2,7 @@
 
 `vision_bench.py` sends a screenshot of a web page to the model with the request to rebuild it as a single HTML file,
 and keeps the answer, the HTML, a rendering of it and the timings (`run*/stats.jsonl`). The write-up is in
-[docs/RTX3090.md](../../docs/RTX3090.md#mode-vision).
+[docs/RTX3090.md](../../docs/RTX3090.md#vision-mode).
 
 ## Sources of the screenshots
 

@@ -1,21 +1,23 @@
-> **strata3090** : une branche de Strata réglée et mesurée pour une RTX 3090 24 Go (Linux, Ryzen 5 5600X, 62 Gio de RAM,
-> Qwen3.8-Flash-Next IQ3_S, contexte 262 144). Configuration, mesures et mode vision : **[docs/RTX3090.md](docs/RTX3090.md)**.
+> **strata3090**: a branch of Strata tuned and measured for one RTX 3090 24 GB (Linux, Ryzen 5 5600X, 62 GiB of RAM,
+> Qwen3.8-Flash-Next IQ3_S, context 262,144). Configuration, measurements and vision mode: **[docs/RTX3090.md](docs/RTX3090.md)**.
 >
-> | Mesure (12 et 13 octobre 2026) | Résultat |
+> | Measurement (12 and 13 October 2026) | Result |
 > | --- | --- |
-> | Génération, contexte court (médiane de 12 prompts, dix mesures) | 121,0 à 123,7 tok/s (base v0.1.43 : 117,0 ; installation d'origine : 94,5) |
-> | Génération, contexte plein (prompt de 257 886 jetons, trois passes) | 93,0 / 90,2 / 91,5 tok/s |
-> | Lecture d'un prompt de 213K jetons | 2 250 tok/s environ |
-> | Réponse de 2 500 tokens d'affilée | 124,8 tok/s |
-> | Vision : capture d'écran refaite en un fichier HTML (3 pages, 1 024 jetons d'image) | pages complètes et fidèles au texte, 139,7 à 147,6 tok/s, 13,3 s d'encodage sur le CPU |
+> | Generation, short context (median of 12 prompts, ten measurements) | 121.0 to 123.7 tok/s (base v0.1.43: 117.0; original install: 94.5) |
+> | Generation, full context (257,886-token prompt, three rounds) | 93.0 / 90.2 / 91.5 tok/s |
+> | Reading a 213K-token prompt | about 2,250 tok/s |
+> | An answer of 2,500 tokens in one go | 124.8 tok/s |
+> | Vision: a screenshot rebuilt as one HTML file (3 pages, 1,024 image tokens) | complete pages, faithful to the text, 139.7 to 147.6 tok/s, 13.3 s of encoding on the CPU |
 >
-> ![Débit à contexte court](docs/img/short_context.png)
-> ![Débit selon le remplissage du contexte](docs/img/long_context.png)
-> ![Mode vision](docs/img/vision.png)
+> ![Throughput at a short context](docs/img/short_context.png)
+> ![Throughput as the context fills](docs/img/long_context.png)
+> ![Vision mode](docs/img/vision.png)
 >
-> Le mode vision reproduit la mise en page et le texte d'une capture de Hacker News, d'un article de Wikipédia et de
-> l'accueil de python.org ; les images d'origine sont remplacées par des formes simples. Détail, limites et fichiers
-> produits : [docs/RTX3090.md](docs/RTX3090.md#mode-vision), `bench/vision/`.
+> Vision mode reproduces the layout and the text of a screenshot of Hacker News, of a Wikipedia article and of the
+> python.org home page; the source images are replaced by simple shapes. Detail, limits and the files
+> produced: [docs/RTX3090.md](docs/RTX3090.md#vision-mode), `bench/vision/`.
+>
+> Version française : [docs/RTX3090.fr.md](docs/RTX3090.fr.md).
 
 <h1 align="center">Strata</h1>
 

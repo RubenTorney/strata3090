@@ -4955,7 +4955,7 @@ def make_handler(svc: Service):
 
         def _body(self) -> bytes:
             self.body_read = True
-            limit = body_limit()
+            limit = min(body_limit(), 128 * 1024) if self.path.startswith("/community/") else body_limit()
             if self._chunked():
                 return self._read_chunked(limit)
             try:
@@ -5141,6 +5141,12 @@ def make_handler(svc: Service):
 
         def do_GET(self):
             path = self.path.split("?")[0].rstrip("/")
+            if path == "/community/state":
+                if not self._authorized():
+                    return
+                community = getattr(svc, "community", None)
+                self._json(200 if community else 404, community.state() if community else {"disabled": True})
+                return
             if path.startswith("/fonts/"):
                 # the web app's font (Outfit, OFL: serve/web/fonts); the page falls back to the system font
                 name = path[len("/fonts/"):]
@@ -5231,7 +5237,7 @@ def make_handler(svc: Service):
                 self._json(200, {"status": "ok", "max_context": svc.reported_ctx(), "model": svc.model,
                                  "images": svc.vision is not None, "api_key": bool(svc.api_key),
                                  "image_generation": svc.images is not None,
-                                 "loaded": svc.loaded(), "service": "strata"})
+                                 "loaded": svc.loaded(), "service": "strata", **({"community": True} if hasattr(svc, "community") else {})})
             elif path.startswith("/v1/images/files/"):
                 # response_format url: the name (32 random hex digits) is the access, as an OpenAI image URL is
                 f = svc.images.file(path[len("/v1/images/files/"):]) if svc.images is not None else None
@@ -5306,16 +5312,40 @@ def make_handler(svc: Service):
                 self._json(404, {"error": {"message": "not found"}})
 
         def do_POST(self):
+            community = getattr(svc, "community", None)
+            # Opt-in admission gate: don't restart the engine during any existing API mutation.
+            gate = community.gate if community and not self.path.startswith("/community/") else None
+            if gate and not gate.acquire(blocking=False):
+                self._json(409, {"error": {"message": "Community benchmark or another request is running"}})
+                return
             try:
                 self._post()
-            except BadBody as e:                              # #893: a malformed or oversized chunked body
+            except BadBody as e:
                 self._json(e.status, {"error": {"type": "invalid_request_error", "message": str(e)}})
+            finally:
+                if gate:
+                    gate.release()
 
         def _post(self):
             if not self._authorized():
                 return
             path = self.path.split("?")[0].rstrip("/")   # issue #55: Claude Code posts /v1/messages?beta=true
             if path.startswith("/v1/") and self._foreign_page():
+                return
+            if path.startswith("/community/"):
+                if not self._own_page("community configurations can be changed"):
+                    return
+                community = getattr(svc, "community", None)
+                if community is None:
+                    self._json(404, {"error": {"message": "Community is disabled; start with --community-db PATH"}})
+                    return
+                try:
+                    req = json.loads(self._body() or b"{}")
+                    result = community.dispatch(path.rsplit("/", 1)[-1], req)
+                except (ValueError, TypeError, RecursionError) as e:
+                    self._json(400, {"error": {"message": str(e)}})
+                    return
+                self._json(200, result)
                 return
             if path == "/settings":
                 self._settings()
@@ -6524,6 +6554,7 @@ def main() -> int:
     ap.add_argument("--script", action="append",
                     help="the mock engine's answer (default: a short greeting); given more than once, requests get "
                          "them in turn and the last one repeats")
+    ap.add_argument("--community-db", help="enable the local community tab with this SQLite database")
     ap.add_argument("--port", type=int, default=8095)
     ap.add_argument("--gpu", help="the GPU to run on, as nvidia-smi numbers them, or several for a layer split "
                                   "(\"0,2\"; also \"gpu\" in the config)")
@@ -6808,6 +6839,9 @@ def main() -> int:
               f"chat: {', '.join(hub.servers)}", flush=True)
         hub.start()
         atexit.register(hub.close)                      # the servers Strata started end with it
+    if a.community_db:
+        from serve.community import Community
+        svc.community = Community(svc, a.community_db)
     httpd = serve(svc, host=a.host, port=a.port)
     svc.start_idle_unload()
     svc.start_vision_idle()

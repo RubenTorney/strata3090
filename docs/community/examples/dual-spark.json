@@ -1,0 +1,50 @@
+{
+  "schema": 1,
+  "title": "Example \u00b7 dual DGX Spark",
+  "author": "Anonymous",
+  "description": "Hardware format example only. No measured results or compatibility claim.",
+  "model": "qwen3.8-flash-next-iq3_s",
+  "published": "2026-10-15T00:00:00+00:00",
+  "settings": {
+    "--prompt-cache": 6
+  },
+  "rig": {
+    "os": "Linux",
+    "cpu": "Unknown",
+    "platform": "DGX Spark",
+    "memory_architecture": "Unified",
+    "interconnect": "ConnectX-7 \u00b7 200 Gb/s (nominal link)",
+    "nodes": [
+      {
+        "os": "Linux",
+        "cpu": "Unknown",
+        "platform": "DGX Spark",
+        "memory_architecture": "Unified",
+        "interconnect": "Unknown",
+        "nodes": [],
+        "ram_type": "LPDDR5X",
+        "ram_gib": 128,
+        "gpus": [
+          {
+            "name": "NVIDIA GB10 (DGX Spark)",
+            "vram_gib": null
+          }
+        ],
+        "gpu": "NVIDIA GB10 (DGX Spark)",
+        "vram_gib": null,
+        "count": 2
+      }
+    ],
+    "ram_type": "LPDDR5X",
+    "ram_gib": 128,
+    "gpus": [
+      {
+        "name": "NVIDIA GB10 (DGX Spark)",
+        "vram_gib": null
+      }
+    ],
+    "gpu": "NVIDIA GB10 (DGX Spark)",
+    "vram_gib": null
+  },
+  "results": []
+}

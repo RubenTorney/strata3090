@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "title": "Example \u00b7 Mac mini M4 Pro",
+  "author": "Anonymous",
+  "description": "Hardware format example only. No measured results or compatibility claim.",
+  "model": "qwen3.8-flash-next-iq3_s",
+  "published": "2026-10-15T00:00:00+00:00",
+  "settings": {
+    "--prompt-cache": 6
+  },
+  "rig": {
+    "os": "macOS",
+    "cpu": "Unknown",
+    "platform": "Mac mini",
+    "memory_architecture": "Unified",
+    "interconnect": "Unknown",
+    "nodes": [],
+    "ram_type": "Unknown",
+    "ram_gib": 64,
+    "gpus": [
+      {
+        "name": "Apple M4 Pro (Mac mini)",
+        "vram_gib": null
+      }
+    ],
+    "gpu": "Apple M4 Pro (Mac mini)",
+    "vram_gib": null
+  },
+  "results": []
+}

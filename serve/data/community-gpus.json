@@ -1,0 +1,340 @@
+[
+  {
+    "id": "nvidia-rtx-3090-24",
+    "vendor": "NVIDIA",
+    "name": "RTX 3090",
+    "vram_gib": 24,
+    "architecture": "Ampere",
+    "source": "https://www.nvidia.com/en-gb/geforce/graphics-cards/compare/",
+    "checked": "2026-10-15"
+  },
+  {
+    "id": "nvidia-rtx-3090-ti-24",
+    "vendor": "NVIDIA",
+    "name": "RTX 3090 Ti",
+    "vram_gib": 24,
+    "architecture": "Ampere",
+    "source": "https://www.nvidia.com/en-gb/geforce/graphics-cards/compare/",
+    "checked": "2026-10-15"
+  },
+  {
+    "id": "nvidia-rtx-3080-ti-12",
+    "vendor": "NVIDIA",
+    "name": "RTX 3080 Ti",
+    "vram_gib": 12,
+    "architecture": "Ampere",
+    "source": "https://www.nvidia.com/en-gb/geforce/graphics-cards/compare/",
+    "checked": "2026-10-15"
+  },
+  {
+    "id": "nvidia-rtx-3080-10gb-10",
+    "vendor": "NVIDIA",
+    "name": "RTX 3080 10GB",
+    "vram_gib": 10,
+    "architecture": "Ampere",
+    "source": "https://www.nvidia.com/en-gb/geforce/graphics-cards/compare/",
+    "checked": "2026-10-15"
+  },
+  {
+    "id": "nvidia-rtx-3080-12gb-12",
+    "vendor": "NVIDIA",
+    "name": "RTX 3080 12GB",
+    "vram_gib": 12,
+    "architecture": "Ampere",
+    "source": "https://www.nvidia.com/en-gb/geforce/graphics-cards/compare/",
+    "checked": "2026-10-15"
+  },
+  {
+    "id": "nvidia-rtx-3070-8",
+    "vendor": "NVIDIA",
+    "name": "RTX 3070",
+    "vram_gib": 8,
+    "architecture": "Ampere",
+    "source": "https://www.nvidia.com/en-gb/geforce/graphics-cards/compare/",
+    "checked": "2026-10-15"
+  },
+  {
+    "id": "nvidia-rtx-3060-12gb-12",
+    "vendor": "NVIDIA",
+    "name": "RTX 3060 12GB",
+    "vram_gib": 12,
+    "architecture": "Ampere",
+    "source": "https://www.nvidia.com/en-gb/geforce/graphics-cards/compare/",
+    "checked": "2026-10-15"
+  },
+  {
+    "id": "nvidia-rtx-4090-24",
+    "vendor": "NVIDIA",
+    "name": "RTX 4090",
+    "vram_gib": 24,
+    "architecture": "Ada Lovelace",
+    "source": "https://www.nvidia.com/en-gb/geforce/graphics-cards/compare/",
+    "checked": "2026-10-15"
+  },
+  {
+    "id": "nvidia-rtx-4080-16",
+    "vendor": "NVIDIA",
+    "name": "RTX 4080",
+    "vram_gib": 16,
+    "architecture": "Ada Lovelace",
+    "source": "https://www.nvidia.com/en-gb/geforce/graphics-cards/compare/",
+    "checked": "2026-10-15"
+  },
+  {
+    "id": "nvidia-rtx-4080-super-16",
+    "vendor": "NVIDIA",
+    "name": "RTX 4080 SUPER",
+    "vram_gib": 16,
+    "architecture": "Ada Lovelace",
+    "source": "https://www.nvidia.com/en-gb/geforce/graphics-cards/compare/",
+    "checked": "2026-10-15"
+  },
+  {
+    "id": "nvidia-rtx-4070-ti-super-16",
+    "vendor": "NVIDIA",
+    "name": "RTX 4070 Ti SUPER",
+    "vram_gib": 16,
+    "architecture": "Ada Lovelace",
+    "source": "https://www.nvidia.com/en-gb/geforce/graphics-cards/compare/",
+    "checked": "2026-10-15"
+  },
+  {
+    "id": "nvidia-rtx-4070-12",
+    "vendor": "NVIDIA",
+    "name": "RTX 4070",
+    "vram_gib": 12,
+    "architecture": "Ada Lovelace",
+    "source": "https://www.nvidia.com/en-gb/geforce/graphics-cards/compare/",
+    "checked": "2026-10-15"
+  },
+  {
+    "id": "nvidia-rtx-4060-ti-16gb-16",
+    "vendor": "NVIDIA",
+    "name": "RTX 4060 Ti 16GB",
+    "vram_gib": 16,
+    "architecture": "Ada Lovelace",
+    "source": "https://www.nvidia.com/en-gb/geforce/graphics-cards/compare/",
+    "checked": "2026-10-15"
+  },
+  {
+    "id": "nvidia-rtx-5090-32",
+    "vendor": "NVIDIA",
+    "name": "RTX 5090",
+    "vram_gib": 32,
+    "architecture": "Blackwell",
+    "source": "https://www.nvidia.com/en-gb/geforce/graphics-cards/compare/",
+    "checked": "2026-10-15"
+  },
+  {
+    "id": "nvidia-rtx-5080-16",
+    "vendor": "NVIDIA",
+    "name": "RTX 5080",
+    "vram_gib": 16,
+    "architecture": "Blackwell",
+    "source": "https://www.nvidia.com/en-gb/geforce/graphics-cards/compare/",
+    "checked": "2026-10-15"
+  },
+  {
+    "id": "nvidia-rtx-5070-ti-16",
+    "vendor": "NVIDIA",
+    "name": "RTX 5070 Ti",
+    "vram_gib": 16,
+    "architecture": "Blackwell",
+    "source": "https://www.nvidia.com/en-gb/geforce/graphics-cards/compare/",
+    "checked": "2026-10-15"
+  },
+  {
+    "id": "nvidia-rtx-5070-12",
+    "vendor": "NVIDIA",
+    "name": "RTX 5070",
+    "vram_gib": 12,
+    "architecture": "Blackwell",
+    "source": "https://www.nvidia.com/en-gb/geforce/graphics-cards/compare/",
+    "checked": "2026-10-15"
+  },
+  {
+    "id": "nvidia-rtx-5060-ti-16gb-16",
+    "vendor": "NVIDIA",
+    "name": "RTX 5060 Ti 16GB",
+    "vram_gib": 16,
+    "architecture": "Blackwell",
+    "source": "https://www.nvidia.com/en-gb/geforce/graphics-cards/compare/",
+    "checked": "2026-10-15"
+  },
+  {
+    "id": "nvidia-tesla-v100-pcie-16gb-16",
+    "vendor": "NVIDIA",
+    "name": "Tesla V100 PCIe 16GB",
+    "vram_gib": 16,
+    "architecture": "Volta",
+    "source": "https://www.nvidia.com/content/dam/en-zz/Solutions/Data-Center/tesla-product-literature/v100-application-performance-guide.pdf",
+    "checked": "2026-10-15",
+    "aliases": [
+      "TV100",
+      "V100"
+    ]
+  },
+  {
+    "id": "nvidia-tesla-v100-pcie-32gb-32",
+    "vendor": "NVIDIA",
+    "name": "Tesla V100 PCIe 32GB",
+    "vram_gib": 32,
+    "architecture": "Volta",
+    "source": "https://www.nvidia.com/content/dam/en-zz/Solutions/Data-Center/tesla-product-literature/v100-application-performance-guide.pdf",
+    "checked": "2026-10-15",
+    "aliases": [
+      "TV100",
+      "V100"
+    ]
+  },
+  {
+    "id": "nvidia-tesla-v100-sxm2-16gb-16",
+    "vendor": "NVIDIA",
+    "name": "Tesla V100 SXM2 16GB",
+    "vram_gib": 16,
+    "architecture": "Volta",
+    "source": "https://www.nvidia.com/content/dam/en-zz/Solutions/Data-Center/tesla-product-literature/v100-application-performance-guide.pdf",
+    "checked": "2026-10-15",
+    "aliases": [
+      "TV100",
+      "V100"
+    ]
+  },
+  {
+    "id": "nvidia-tesla-v100-sxm2-32gb-32",
+    "vendor": "NVIDIA",
+    "name": "Tesla V100 SXM2 32GB",
+    "vram_gib": 32,
+    "architecture": "Volta",
+    "source": "https://www.nvidia.com/content/dam/en-zz/Solutions/Data-Center/tesla-product-literature/v100-application-performance-guide.pdf",
+    "checked": "2026-10-15",
+    "aliases": [
+      "TV100",
+      "V100"
+    ]
+  },
+  {
+    "id": "amd-radeon-rx-7900-xtx-24",
+    "vendor": "AMD",
+    "name": "Radeon RX 7900 XTX",
+    "vram_gib": 24,
+    "architecture": "RDNA 3",
+    "source": "https://rocm.docs.amd.com/en/docs-7.0.2/reference/gpu-arch-specs.html",
+    "checked": "2026-10-15"
+  },
+  {
+    "id": "amd-radeon-rx-7900-xt-20",
+    "vendor": "AMD",
+    "name": "Radeon RX 7900 XT",
+    "vram_gib": 20,
+    "architecture": "RDNA 3",
+    "source": "https://rocm.docs.amd.com/en/docs-7.0.2/reference/gpu-arch-specs.html",
+    "checked": "2026-10-15"
+  },
+  {
+    "id": "amd-radeon-rx-7800-xt-16",
+    "vendor": "AMD",
+    "name": "Radeon RX 7800 XT",
+    "vram_gib": 16,
+    "architecture": "RDNA 3",
+    "source": "https://rocm.docs.amd.com/en/docs-7.0.2/reference/gpu-arch-specs.html",
+    "checked": "2026-10-15"
+  },
+  {
+    "id": "amd-radeon-rx-7700-xt-12",
+    "vendor": "AMD",
+    "name": "Radeon RX 7700 XT",
+    "vram_gib": 12,
+    "architecture": "RDNA 3",
+    "source": "https://rocm.docs.amd.com/en/docs-7.0.2/reference/gpu-arch-specs.html",
+    "checked": "2026-10-15"
+  },
+  {
+    "id": "amd-radeon-rx-9070-xt-16",
+    "vendor": "AMD",
+    "name": "Radeon RX 9070 XT",
+    "vram_gib": 16,
+    "architecture": "RDNA 4",
+    "source": "https://rocm.docs.amd.com/en/docs-7.0.2/reference/gpu-arch-specs.html",
+    "checked": "2026-10-15"
+  },
+  {
+    "id": "amd-radeon-rx-9070-16",
+    "vendor": "AMD",
+    "name": "Radeon RX 9070",
+    "vram_gib": 16,
+    "architecture": "RDNA 4",
+    "source": "https://rocm.docs.amd.com/en/docs-7.0.2/reference/gpu-arch-specs.html",
+    "checked": "2026-10-15"
+  },
+  {
+    "id": "intel-arc-a770-16gb-16",
+    "vendor": "Intel",
+    "name": "Arc A770 16GB",
+    "vram_gib": 16,
+    "architecture": "Xe HPG",
+    "source": "https://www.intel.com/content/www/us/en/products/sku/229151/intel-arc-a770-graphics-16gb/specifications.html",
+    "checked": "2026-10-15"
+  },
+  {
+    "id": "intel-arc-b580-12",
+    "vendor": "Intel",
+    "name": "Arc B580",
+    "vram_gib": 12,
+    "architecture": "Xe2",
+    "source": "https://cdrdv2-public.intel.com/839907/Intel%20Arc%20B-Series%20Graphics%20Quick%20Reference%20Guide%20V1.1.pdf",
+    "checked": "2026-10-15"
+  },
+  {
+    "id": "intel-arc-b570-10",
+    "vendor": "Intel",
+    "name": "Arc B570",
+    "vram_gib": 10,
+    "architecture": "Xe2",
+    "source": "https://cdrdv2-public.intel.com/839907/Intel%20Arc%20B-Series%20Graphics%20Quick%20Reference%20Guide%20V1.1.pdf",
+    "checked": "2026-10-15"
+  },
+  {
+    "id": "apple-m4",
+    "vendor": "Apple",
+    "name": "Apple M4 (Mac mini)",
+    "vram_gib": null,
+    "architecture": "Apple M4",
+    "memory_architecture": "Unified",
+    "unified_memory_options_gib": [
+      16,
+      24,
+      32
+    ],
+    "source": "https://support.apple.com/en-gb/121555",
+    "checked": "2026-10-15"
+  },
+  {
+    "id": "apple-m4-pro",
+    "vendor": "Apple",
+    "name": "Apple M4 Pro (Mac mini)",
+    "vram_gib": null,
+    "architecture": "Apple M4 Pro",
+    "memory_architecture": "Unified",
+    "unified_memory_options_gib": [
+      24,
+      48,
+      64
+    ],
+    "source": "https://support.apple.com/en-gb/121555",
+    "checked": "2026-10-15"
+  },
+  {
+    "id": "nvidia-gb10",
+    "vendor": "NVIDIA",
+    "name": "NVIDIA GB10 (DGX Spark)",
+    "vram_gib": null,
+    "architecture": "Grace Blackwell",
+    "memory_architecture": "Unified",
+    "unified_memory_options_gib": [
+      128
+    ],
+    "source": "https://docs.nvidia.com/dgx/dgx-spark/hardware.html",
+    "checked": "2026-10-15"
+  }
+]

@@ -1,0 +1,95 @@
+{
+  "id": "97cd3e77cea34d60a6a8622122d570cc",
+  "config_id": "e7217dcc9b6944738c1c6c4de12686f4",
+  "created": "2026-10-15T09:45:48+00:00",
+  "rig": {
+    "os": "Linux",
+    "cpu": "AMD Ryzen 5 5600X 6-Core Processor",
+    "ram_type": "DDR4",
+    "ram_gib": 62.70704650878906,
+    "gpus": [
+      {
+        "name": "NVIDIA GeForce RTX 3090",
+        "vram_gib": 24.0
+      }
+    ],
+    "gpu": "NVIDIA GeForce RTX 3090",
+    "vram_gib": 24.0
+  },
+  "model": "qwen3.8-flash-next-iq3_s",
+  "protocol": "strata-community-code-v1",
+  "baseline_settings": {
+    "--spec": 4,
+    "--pcie-frac": 0.35,
+    "--spec-min-p": 0.7,
+    "--adapt-every": 1,
+    "--adapt-swaps": 80,
+    "--adapt-decay": 0.97,
+    "--prompt-cache": 6
+  },
+  "effective_settings": {
+    "--adapt-decay": 0.97,
+    "--adapt-every": 1,
+    "--adapt-swaps": 80,
+    "--pcie-frac": 0.35,
+    "--prompt-cache": 2,
+    "--spec": 4,
+    "--spec-min-p": 0.7
+  },
+  "baseline": [
+    {
+      "protocol": "strata-community-code-v1",
+      "phase": "cold",
+      "ttft_s": 0.5626607919984963,
+      "decode_tok_s": 89.7,
+      "output_tokens": 128,
+      "prompt_tokens": 33,
+      "duration_s": 1.9570401870005298,
+      "ram_peak_gib": 55.99478530883789,
+      "vram_peak_gib": 23.71783447265625,
+      "answer_sha256": "d902bf3ee6cd885ff3b4d206f77fd1d156ac23429d5fdcf74c624c378fb17ae5",
+      "simulated": false
+    },
+    {
+      "protocol": "strata-community-code-v1",
+      "phase": "warm",
+      "ttft_s": 0.057100486010313034,
+      "decode_tok_s": 138.9,
+      "output_tokens": 128,
+      "prompt_tokens": 33,
+      "duration_s": 0.9653603800106794,
+      "ram_peak_gib": 55.98493957519531,
+      "vram_peak_gib": 23.72601318359375,
+      "answer_sha256": "d902bf3ee6cd885ff3b4d206f77fd1d156ac23429d5fdcf74c624c378fb17ae5",
+      "simulated": false
+    }
+  ],
+  "candidate": [
+    {
+      "protocol": "strata-community-code-v1",
+      "phase": "cold",
+      "ttft_s": 0.4446342760056723,
+      "decode_tok_s": 95.2,
+      "output_tokens": 128,
+      "prompt_tokens": 33,
+      "duration_s": 1.759696557011921,
+      "ram_peak_gib": 56.105224609375,
+      "vram_peak_gib": 23.71697998046875,
+      "answer_sha256": "d902bf3ee6cd885ff3b4d206f77fd1d156ac23429d5fdcf74c624c378fb17ae5",
+      "simulated": false
+    },
+    {
+      "protocol": "strata-community-code-v1",
+      "phase": "warm",
+      "ttft_s": 0.05675688499468379,
+      "decode_tok_s": 146.4,
+      "output_tokens": 128,
+      "prompt_tokens": 33,
+      "duration_s": 0.9180408880056348,
+      "ram_peak_gib": 56.105224609375,
+      "vram_peak_gib": 23.72515869140625,
+      "answer_sha256": "d902bf3ee6cd885ff3b4d206f77fd1d156ac23429d5fdcf74c624c378fb17ae5",
+      "simulated": false
+    }
+  ]
+}

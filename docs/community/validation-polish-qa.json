@@ -1,0 +1,215 @@
+{
+  "date": "2026-10-15",
+  "automated": {
+    "command": "python -m unittest serve.test_community serve.test_runconfig serve.test_security serve.test_lifecycle serve.test_server tools.test_strata_bench -q",
+    "tests": 389,
+    "seconds": 135.067,
+    "result": "OK",
+    "notes": [
+      "The suite prints ResourceWarnings about temporary log files; no test failed."
+    ]
+  },
+  "browser": {
+    "engine": "Codex in-app Chromium",
+    "viewports": [
+      [
+        1440,
+        1000
+      ],
+      [
+        390,
+        844
+      ],
+      [
+        320,
+        740
+      ]
+    ],
+    "themes": [
+      "light",
+      "dark"
+    ],
+    "checks": [
+      "bounded dialog shell and inset scrollbars",
+      "persistent header and editor footer",
+      "wide table contained with keyboard focus",
+      "empty required name validation",
+      "Escape and close",
+      "expanded inspector result survives refreshed state",
+      "save new preset",
+      "export and file reimport without duplication",
+      "shared link preview and cancel",
+      "personal favorite/rating roundtrip restored",
+      "mixed-GPU filter and reset",
+      "grid/list",
+      "metric selection and history",
+      "no console warnings/errors observed"
+    ],
+    "untested": [
+      "other browser engines",
+      "screen-reader audit"
+    ]
+  },
+  "real_engine_lifecycle": [
+    {
+      "action": "adopt",
+      "job": {
+        "state": "done",
+        "phase": "adopt",
+        "action": "adopt",
+        "config_id": "003e08d7370d4ac682b95cef33259de1",
+        "benchmark": "quick",
+        "completed": 0,
+        "total": 4,
+        "started": "2026-10-15T16:55:47+00:00",
+        "paused": false,
+        "pause_requested": false,
+        "finishing": true
+      },
+      "settings": {
+        "--adapt-decay": 0.97,
+        "--adapt-every": 1,
+        "--adapt-swaps": 160,
+        "--pcie-frac": 0.35,
+        "--prompt-cache": 6,
+        "--spec": 4,
+        "--spec-min-p": 0.7
+      },
+      "can_restore": true
+    },
+    {
+      "action": "reload",
+      "job": {
+        "state": "done",
+        "phase": "reload",
+        "action": "reload",
+        "config_id": null,
+        "benchmark": "quick",
+        "completed": 0,
+        "total": 4,
+        "started": "2026-10-15T16:56:18+00:00",
+        "paused": false,
+        "pause_requested": false,
+        "finishing": true
+      },
+      "settings": {
+        "--adapt-decay": 0.97,
+        "--adapt-every": 1,
+        "--adapt-swaps": 160,
+        "--pcie-frac": 0.35,
+        "--prompt-cache": 6,
+        "--spec": 4,
+        "--spec-min-p": 0.7
+      },
+      "can_restore": true
+    },
+    {
+      "action": "restore",
+      "job": {
+        "state": "done",
+        "phase": "restore",
+        "action": "restore",
+        "config_id": null,
+        "benchmark": "quick",
+        "completed": 0,
+        "total": 4,
+        "started": "2026-10-15T16:56:51+00:00",
+        "paused": false,
+        "pause_requested": false,
+        "finishing": true
+      },
+      "settings": {
+        "--spec": 4,
+        "--pcie-frac": 0.35,
+        "--spec-min-p": 0.7,
+        "--adapt-every": 1,
+        "--adapt-swaps": 80,
+        "--adapt-decay": 0.97,
+        "--prompt-cache": 6
+      },
+      "can_restore": false
+    },
+    {
+      "action": "pause-cancel-restore",
+      "job": {
+        "state": "failed",
+        "phase": "benchmark",
+        "action": "benchmark",
+        "config_id": "003e08d7370d4ac682b95cef33259de1",
+        "benchmark": "quick",
+        "completed": 0,
+        "total": 4,
+        "started": "2026-10-15T16:57:24+00:00",
+        "paused": false,
+        "pause_requested": false,
+        "error": "Cancelled",
+        "finishing": true
+      },
+      "partial_runs_saved": false,
+      "settings": {
+        "--spec": 4,
+        "--pcie-frac": 0.35,
+        "--spec-min-p": 0.7,
+        "--adapt-every": 1,
+        "--adapt-swaps": 80,
+        "--adapt-decay": 0.97,
+        "--prompt-cache": 6
+      }
+    },
+    {
+      "action": "/community/save",
+      "expected_rejection": 400,
+      "passed": true
+    },
+    {
+      "action": "/community/save",
+      "expected_rejection": 400,
+      "passed": true
+    },
+    {
+      "action": "/community/reload",
+      "expected_rejection": 403,
+      "passed": true
+    },
+    {
+      "action": "/community/reload",
+      "expected_rejection": 415,
+      "passed": true
+    },
+    {
+      "action": "/community/pause",
+      "expected_rejection": 400,
+      "passed": true
+    },
+    {
+      "action": "private-run-config-unchanged",
+      "passed": true
+    }
+  ],
+  "final": {
+    "settings": {
+      "--spec": 4,
+      "--pcie-frac": 0.35,
+      "--spec-min-p": 0.7,
+      "--adapt-every": 1,
+      "--adapt-swaps": 80,
+      "--adapt-decay": 0.97,
+      "--prompt-cache": 6
+    },
+    "can_restore": false,
+    "max_context": 262144,
+    "images": true,
+    "loaded": true,
+    "configs_added": 1,
+    "completed_comparisons_added": 3,
+    "restarted_with_id_fix": true,
+    "malformed_id_live_http_status": 400
+  },
+  "automated_after_id_fix": {
+    "command": "python -m unittest serve.test_community -q",
+    "tests": 24,
+    "seconds": 13.679,
+    "result": "OK",
+    "new_case": "32 malformed-ID requests across export, preference, adopt and benchmark return JSON 400 without engine changes"
+  }
+}

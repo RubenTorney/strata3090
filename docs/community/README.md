@@ -4,6 +4,8 @@ An opt-in extension of the existing Strata 0.1.44 portal. It reuses Outfit, Stra
 CSS tokens, cards, tabs, buttons, light/dark themes, authentication and telemetry.
 No frontend framework, external CDN, online account or new Python dependency.
 
+**Maintainers:** [complete architecture, API, storage and lifecycle guide](MAINTAINER.md).
+
 ## Start
 
 Use the Python environment you already use for Strata, from this checkout:
@@ -224,3 +226,58 @@ configuration was restored; context 262,144 and vision remained enabled.
 Raw records: [validation-benchmark-desk-rtx3090.json](validation-benchmark-desk-rtx3090.json).
 The context and agent adapters were exercised with the mock engine; no new real long-context,
 vision, Windows, AMD or physical multi-GPU benchmark was run for this change.
+
+## Real workflow and modal polish validation — 15 October 2026
+
+The maintainer reference is [MAINTAINER.md](MAINTAINER.md): activation, UI flows,
+metadata capture, tables, bundle schema, HTTP routes, lifecycle, admission, recovery,
+benchmark interpretation and future hosted-service boundaries.
+
+The dialogs now have a clipped rounded shell, an inset scrollable body and a fixed
+header. The editor keeps Save/Cancel visible. Wide result tables scroll inside a
+keyboard-focusable region. Polling no longer closes an expanded inspector result table.
+Cards distinguish recorded comparisons with unequal input lengths from untested entries;
+they do not invent a percentage for unequal workloads. A deliberately cancelled job
+shows that the original settings were restored, rather than an unexplained error.
+
+Three new paired comparisons ran through the live Community server, using the upstream
+0.1.44 binary, RTX 3090, Ryzen 5 5600X, IQ3_S, **262,144 configured context** and CPU vision
+enabled. There were **28 measured requests**, plus the repository warm-up/calibration
+requests. These scenarios exercise up to about **16K actual input tokens**, not a filled
+256K context. No image was sent in this validation.
+
+| Candidate / scenario | Mean TTFT, baseline → candidate | Median request decode rate, baseline → candidate | Matching answer hashes |
+| --- | --- | --- | --- |
+| Cache slots 6 → 2 / six coding turns | 2.008 → 2.064 s | 76.05 → 77.75 tok/s | 1 / 6 |
+| Adapt swaps 80 → 160 / six coding turns | 1.926 → 1.922 s | 89.70 → 92.20 tok/s | 0 / 6 |
+| Adapt swaps 80 → 160 / fresh 4K prompt | 2.221 → 2.273 s | 70.3 → 56.7 tok/s | See raw hashes |
+| Adapt swaps 80 → 160 / fresh 16K prompt | 7.189 → 7.325 s | 79.0 → 74.3 tok/s | See raw hashes |
+
+The agent summaries are descriptive aggregates, not matched-output speedups: answers,
+output lengths and some continuation lengths differ. The context prompts had matched
+input lengths (4,021 and 16,059 tokens), but only 24 generated tokens per request;
+short decode measurements are noisy. Each comparison has its own freshly restarted
+baseline. Desktop/browser activity and existing swap usage remained; this was a real
+interactive machine, not an isolated performance lab. No tuning default was changed.
+
+Raw measurements, exact settings and per-request memory/cache statistics:
+[validation-real-workflows-rtx3090.json](validation-real-workflows-rtx3090.json).
+
+Real-engine lifecycle checks exercised load → reload → undo, pause/resume between
+requests, rejection of concurrent inference, and pause → stop → restore. Cancellation
+saved no partial run. The original settings and private run-config file were preserved.
+The historical preview server was stopped; only one language-model engine and its
+required CPU vision helper were retained.
+
+Browser checks cover desktop, 390×844 and 320×740, light/dark, native Escape/close,
+long editor fields, fixed footer, scoped table scroll, save, file export/reimport
+without duplication, portable-link preview/cancel, favorites/ratings, grid/list,
+filters and chart selection. The latest automated regression result and lifecycle
+checks are recorded in [validation-polish-qa.json](validation-polish-qa.json).
+Physical multi-GPU, AMD, Windows, vision input and filled-256K execution were not run
+for this UI/documentation change. Those remain separate hardware/workload validations.
+
+Additional invalid-input testing found and fixed malformed configuration IDs closing the HTTP
+connection. They now return JSON HTTP 400 before SQL or engine access. The original **389-test**
+regression pass succeeded; after this fix, all **24 focused Community tests** passed, including
+32 malformed-ID requests across four endpoints. The live server was restarted to load the fix.

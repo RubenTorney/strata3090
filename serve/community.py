@@ -278,6 +278,8 @@ class Library:
             return db.execute("SELECT id FROM configs WHERE fingerprint=?", (digest,)).fetchone()[0]
 
     def get(self, cid):
+        if not isinstance(cid, str) or len(cid) != 32 or any(c not in "0123456789abcdef" for c in cid):
+            raise ValueError("Invalid configuration ID")
         with self.db() as db:
             row = db.execute("SELECT * FROM configs WHERE id=?", (cid,)).fetchone()
         if not row:

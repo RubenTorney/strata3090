@@ -38,9 +38,10 @@ window.strataCommunity = (() => {
   function gainText(c) {
     const run = runFor(c.id), a=warm(run?.baseline), b=warm(run?.candidate);
     if (comparable(a,b)) return `<strong>${delta(a,b,"decode_tok_s",true)} generation</strong><span>${delta(a,b,"ttft_s",false)} first-token wait</span><small>Measured pair · ${esc(b.phase)} · ${esc(run.created.slice(0,10))}</small>`;
+    if(run && a && b) return `<strong>${a.simulated || b.simulated ? "Simulation recorded" : "Comparison recorded"}</strong><span>${a.simulated || b.simulated ? "No real performance claim" : "Prompt lengths differ · open results"}</span><small>${esc(b.phase)} · ${esc(run.created.slice(0,10))}</small>`;
     return `<strong>Gain not measured</strong><span>${warm(c.results) ? "Shared result · unverified on your PC" : "Test this setup against yours"}</span><small>No predicted percentage without a local comparison</small>`;
   }
-  function openConfig(id) { selected=id; renderDetail(); el("inspector").showModal(); el("inspector").scrollTop=0; status(); }
+  function openConfig(id) { selected=id; renderDetail(); el("inspector").showModal(); el("inspector-body").scrollTop=0; status(); }
   function renderList() {
     if (!state) return;
     const query=el("search").value.toLowerCase().replace(/tv100/g,"v100"), gpu=el("gpu").value, topology=el("topology").value, os=el("os").value;
@@ -117,6 +118,10 @@ window.strataCommunity = (() => {
   }
   function renderComparison(c) {
     const run = runFor(c.id);
+    // Polling progress must not close expanded tables or steal keyboard focus.
+    const signature = `${c.id}/${run?.id || "unmeasured"}`;
+    if (el("comparison").dataset.rendered === signature) return;
+    el("comparison").dataset.rendered = signature;
     if (!run) {
     el("comparison").innerHTML = `<h2>Ready for a local comparison</h2><p class="co-note">Test this configuration to see generation speed, first-token wait and memory use on your PC.</p>${warm(c.results) ? '<h3>Shared warm result · unverified</h3>' + metrics(warm(c.results)) : ''}`;
       return;
@@ -130,7 +135,7 @@ window.strataCommunity = (() => {
     const perGpu = run.candidate.flatMap(r => (r.gpu_peaks || []).map(g => `${r.phase} · GPU ${g.index}: ${n(g.peak_gib," GiB")}`));
     el("comparison").innerHTML = `<h2>${warm(run.candidate)?.simulated ? "Simulation · not a performance result" : "Measured on your PC"}</h2>
       <p class="co-note">${esc(c.title)} · ${esc(run.created)} · ${esc(run.protocol)}<br>Measured rig: ${esc(rigSummary(run.rig))} · ${esc(run.rig.os)} · ${n(run.rig.ram_gib," GiB",1)} ${esc(run.rig.ram_type || "Unknown")}</p>
-      <button class="st-btn st-btn--primary" id="co-charts">Open charts & history</button><details class="co-method"><summary>Request details</summary><table class="co-table"><thead><tr><th>Request</th><th>Metric</th><th>Baseline at test time</th><th>Selected configuration</th><th>Change</th></tr></thead><tbody>${rows}</tbody></table></details>
+      <button class="st-btn st-btn--primary" id="co-charts">Open charts & history</button><details class="co-method"><summary>Request details</summary><div class="bw-table-scroll" tabindex="0" role="region" aria-label="Request metrics"><table class="co-table"><thead><tr><th>Request</th><th>Metric</th><th>Baseline at test time</th><th>Selected configuration</th><th>Change</th></tr></thead><tbody>${rows}</tbody></table></div></details>
       ${perGpu.length ? `<p class="co-note">Selected configuration, per-device sampled peaks: ${esc(perGpu.join(" · "))}</p>` : ""}
       <details class="co-method"><summary>How to read these results</summary><p class="co-note">One pass · ${esc(run.source || "serve/community.py")}. Cold = fresh engine cache, not cold disk cache. First token = first streamed text event (includes preparation, excludes engine loading and HTTP transport). Memory = sampled system/device usage, not process-only allocation; short peaks can be missed. — means unavailable, never zero. ${sameAnswers ? "Answer hashes match." : "Answers differ: speed is not a quality score."} No extrapolation to other contexts.</p></details>`;
     el("charts").onclick=()=>window.strataBench.open(c.id);
@@ -139,6 +144,7 @@ window.strataCommunity = (() => {
     const j=state.job;
     let content="";
     if(j.state==="running")content=`<div class="co-status"><span><strong>${j.action==="benchmark" ? "Comparing configurations" : "Updating settings"}</strong><br>${j.paused ? "Paused between requests" : esc(j.phase)}</span>${j.action==="benchmark" ? '<button class="st-btn st-btn--secondary" data-progress>View progress</button>' : ""}</div>`;
+    else if(j.error==="Cancelled")content='<div class="co-status">Stopped · original settings restored. No partial comparison saved.</div>';
     else if(j.error)content=`<div class="co-status">${esc(j.error)}</div>`;
     else if(j.state==="done")content=`<div class="co-status">${esc(j.phase)} · complete</div>`;
     el("status").innerHTML=(state.simulated ? '<div class="co-status">Mock engine · UI demonstration only. No real performance measurements.</div>' : "")+content;
@@ -192,9 +198,9 @@ window.strataCommunity = (() => {
     el("edit-ram").value = state.rig.ram_gib == null ? "" : Math.round(state.rig.ram_gib);
     el("edit-ram-type").innerHTML = (state.ram_types || ["Unknown","DDR4","DDR5"]).map(t => `<option>${esc(t)}</option>`).join("");
     el("edit-ram-type").value=state.rig.ram_type || "Unknown";
-    el("editor").showModal(); el("title").focus();
+    el("editor").showModal(); el("editor-body").scrollTop=0; el("title").focus({preventScroll:true});
   };
-  el("close").onclick = () => el("editor").close();
+  el("close").onclick = el("editor-dismiss").onclick = () => el("editor").close();
   el("form").onsubmit = async event => {
     event.preventDefault();
     if(submitting)return;submitting=true;el("submit").disabled=true;el("submit").textContent="Saving…";
@@ -225,7 +231,8 @@ window.strataCommunity = (() => {
       if(encoded.length>16000)throw new Error("Shared link is too large. Import the JSON file instead.");
       const doc=JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(encoded),c=>c.charCodeAt(0))));
       const dialog=document.createElement("dialog");dialog.className="co-dialog";
-      dialog.innerHTML=`<h2>Import shared configuration?</h2><p>${esc(String(doc.title || "Unnamed setup"))}</p><p class="co-note">${esc(String(doc.model || "Unknown model"))}. This adds a copy to your library. Nothing is applied or executed.</p><div class="co-actions"><button class="st-btn st-btn--secondary" data-dismiss>Cancel</button><button class="st-btn st-btn--primary" data-import>Import configuration</button></div>`;
+      dialog.setAttribute("aria-labelledby","co-import-title");
+      dialog.innerHTML=`<header class="co-inspector-head"><h2 id="co-import-title">Import shared configuration?</h2></header><div class="co-dialog-body"><p>${esc(String(doc.title || "Unnamed setup"))}</p><p class="co-note">${esc(String(doc.model || "Unknown model"))}. This adds a copy to your library. Nothing is applied or executed.</p></div><footer class="co-actions co-dialog-footer"><button class="st-btn st-btn--secondary" data-dismiss>Cancel</button><button class="st-btn st-btn--primary" data-import>Import configuration</button></footer>`;
       document.body.appendChild(dialog);dialog.showModal();dialog.querySelector("[data-dismiss]").onclick=()=>dialog.close();
       dialog.querySelector("[data-import]").onclick=async()=>{try{const r=await api("import",doc);selected=r.id;dialog.close();await load();openConfig(r.id);}catch(e){error(e);}};
       dialog.addEventListener("close",()=>dialog.remove());

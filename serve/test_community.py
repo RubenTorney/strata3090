@@ -106,6 +106,18 @@ class HttpTests(unittest.TestCase):
         self.assertEqual(self.request('/community/adopt',{'id':cid})[0],200)
         self.assertEqual(self.wait()['job']['state'],'done')
 
+    def test_invalid_ids_return_json_errors_without_engine_changes(self):
+        community = self.svc.community
+        with patch.object(community, 'restart') as restart:
+            for action in ('export', 'preference', 'adopt', 'benchmark'):
+                for value in (None, {}, [], 7, True, '', 'x' * 32, 'a' * 300):
+                    with self.subTest(action=action, value=value):
+                        code, body = self.request('/community/' + action, {'id': value})
+                        self.assertEqual(code, 400)
+                        self.assertEqual(body['error']['message'], 'Invalid configuration ID')
+            restart.assert_not_called()
+        self.assertEqual(self.request('/community/state')[1]['job']['state'], 'idle')
+
     def test_auth_csrf_limits_and_gate(self):
         self.assertEqual(self.request('/community/import',example(),{'Origin':'https://evil.example'})[0],403)
         self.assertEqual(self.request('/community/import',example(),{'Content-Type':'text/plain'})[0],415)

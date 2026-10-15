@@ -142,7 +142,7 @@ def ram_type():
 def bundle(raw):
     if not isinstance(raw, dict) or raw.get("schema") != 1:
         raise ValueError("Expected a Strata community bundle (schema 1)")
-    allowed = {"schema", "title", "author", "description", "published", "model", "rig", "settings", "results"}
+    allowed = {"schema", "title", "author", "description", "published", "model", "rig", "settings", "results", "runtime"}
     if set(raw) - allowed:
         raise ValueError("Unknown bundle fields; export a community bundle, not a private run config")
     rig = validate_rig(raw.get("rig", {}))
@@ -157,10 +157,30 @@ def bundle(raw):
         datetime.fromisoformat(out["published"].replace("Z", "+00:00"))
     except ValueError:
         raise ValueError("Invalid publication date") from None
+    if "runtime" in raw:
+        out["runtime"] = validate_runtime(raw["runtime"])
     results = raw.get("results", [])
     if not isinstance(results, list) or len(results) > 8:
         raise ValueError("At most eight reported measurements")
     out["results"] = [validate_result(r) for r in results]
+    return out
+
+
+def validate_runtime(raw):
+    numeric = {"max_context", "expert_slots", "pool_workers", "cores", "threads"}
+    strings = {"version", "kv"}
+    if not isinstance(raw, dict) or set(raw) - numeric - strings - {"images"}:
+        raise ValueError("Invalid runtime metadata")
+    out = {}
+    for key, value in raw.items():
+        if key in numeric:
+            out[key] = int(number(value, key, 0, 100000000))
+        elif key in strings:
+            out[key] = text(value, key, 80)
+        else:
+            if type(value) is not bool:
+                raise ValueError("Invalid vision flag")
+            out[key] = value
     return out
 
 
@@ -233,6 +253,12 @@ class Library:
         encoded = json.dumps(doc, sort_keys=True, ensure_ascii=False)
         digest = hashlib.sha256(encoded.encode()).hexdigest()
         with self.db() as db:
+            # JS JSON round trips turn 24.0 into 24. Compare numeric values, not just serialization.
+            # Also accepts libraries created before this normalization without rewriting saved profiles.
+            db.execute("BEGIN IMMEDIATE")
+            for existing in db.execute("SELECT id,document FROM configs ORDER BY added ASC"):
+                if json.loads(existing["document"]) == doc:
+                    return existing["id"]
             db.execute("INSERT OR IGNORE INTO configs(id,fingerprint,document,origin,added) VALUES(?,?,?,?,?)",
                        (uuid.uuid4().hex, digest, encoded, origin, now()))
             return db.execute("SELECT id FROM configs WHERE fingerprint=?", (digest,)).fetchone()[0]
@@ -297,6 +323,13 @@ class Community:
                              "ram_gib": h.get("ram_total", 0) / 2**30 or None,
                              "ram_type": declared[0] if declared else ram_type()})
 
+    def runtime(self):
+        metrics = self.svc.metrics()
+        engine, hardware = metrics.get("engine", {}), metrics.get("hardware_static", {})
+        values = {k: engine[k] for k in ("version", "max_context", "kv", "images", "expert_slots", "pool_workers") if engine.get(k) is not None}
+        values.update({k: hardware[k] for k in ("cores", "threads") if hardware.get(k) is not None})
+        return validate_runtime(values)
+
     def current(self):
         spawn = getattr(self.svc.engine, "spawn", None)
         return from_args(spawn[1]) if spawn else {}
@@ -305,7 +338,7 @@ class Community:
         with self.lock:
             job = copy.deepcopy(self.job)
         return {"configs": self.library.list(), "runs": self.library.runs(), "gpus": self.library.gpus(),
-                "rig": self.rig(), "model": self.svc.model, "platforms": PLATFORMS, "memory_architectures": MEMORY_ARCH, "settings": self.current(), "knobs": SCHEMA,
+                "rig": self.rig(), "runtime": self.runtime(), "model": self.svc.model, "platforms": PLATFORMS, "memory_architectures": MEMORY_ARCH, "settings": self.current(), "knobs": SCHEMA,
                 "job": job, "can_restore": self.previous_spawn is not None,
                 "simulated": not hasattr(self.svc.engine, "spawn"), "protocol": PROTOCOL, "ram_types": RAM_TYPES}
 
@@ -316,7 +349,7 @@ class Community:
             return {"id": self.library.add(req)}
         if action == "save":
             doc = {"schema": 1, "title": req.get("title"), "author": req.get("author", ""),
-                   "description": req.get("description", ""), "model": self.svc.model,
+                   "description": req.get("description", ""), "model": self.svc.model, "runtime": self.runtime(),
                    "rig": validate_rig(req.get("rig", self.rig())), "settings": settings(req.get("settings", self.current()))}
             cid = self.library.add(doc, "local")
             with self.library.db() as db:
@@ -335,6 +368,10 @@ class Community:
                 doc["results"] = run["candidate"]
                 doc["rig"] = run["rig"]
                 doc["settings"] = run["effective_settings"]
+                if "runtime" in run:
+                    doc["runtime"] = run["runtime"]
+                else:
+                    doc.pop("runtime", None)
             doc["author"] = text(req.get("author", ""), "author", 40) or "Anonymous"
             return doc
         if action == "cancel":
@@ -401,7 +438,7 @@ class Community:
                     self.previous_spawn = original
             else:
                 run = {"id": uuid.uuid4().hex, "config_id": selected["id"], "created": now(), "rig": self.rig(),
-                       "model": self.svc.model, "protocol": PROTOCOL, "baseline_settings": self.current(),
+                       "model": self.svc.model, "runtime": self.runtime(), "protocol": PROTOCOL, "baseline_settings": self.current(),
                        "effective_settings": from_args(candidate[1]) if candidate else selected["settings"],
                        "baseline": [], "candidate": []}
                 for arm, spawn in (("baseline", original), ("candidate", candidate)):

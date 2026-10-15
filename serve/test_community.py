@@ -35,6 +35,14 @@ class LibraryTests(unittest.TestCase):
         self.assertGreater(len(self.db.gpus()),25)
         self.assertEqual(Library(self.db.path).get(cid)['rating'],5)
 
+    def test_browser_numeric_roundtrip_deduplicates(self):
+        c=example();c['published']='2026-10-15T10:00:00+00:00';c['rig']['vram_gib']=24.0
+        cid=self.db.add(c)
+        doc=self.db.export(cid)
+        doc['rig']['gpus'][0]['vram_gib']=24
+        doc['rig']['vram_gib']=24
+        self.assertEqual(self.db.add(doc),cid)
+
     def test_reject_sensitive_and_unbounded_input(self):
         for key in ('exe','args','env','api_key','cwd','before_load'):
             c=example();c[key]='bad'
@@ -208,5 +216,20 @@ class RestartTests(unittest.TestCase):
                 result=c.measure('cold')
             self.assertEqual(result['ram_peak_gib'],32)
             self.assertEqual(result['gpu_peaks'],[{'index':0,'peak_gib':12},{'index':2,'peak_gib':8}])
+
+class AutoMetadataTests(HttpTests):
+    def test_auto_snapshot_and_metadata_whitelist(self):
+        self.svc.engine.info = {"version":"0.1.44", "kv":"int8", "api_key":"not-exported", "model_path":"/private/model"}
+        code, item = self.request('/community/save', {'title':'Automatic'})
+        self.assertEqual(code,200)
+        doc=self.svc.community.library.export(item['id'])
+        self.assertEqual(doc['model'],'test')
+        self.assertEqual(doc['runtime']['version'],'0.1.44')
+        self.assertIn('gpus',doc['rig'])
+        self.assertNotIn('api_key',doc['runtime'])
+        self.assertNotIn('model_path',doc['runtime'])
+        self.assertEqual(bundle(doc),doc)
+        with self.assertRaises(ValueError):bundle({**doc,'runtime':{'api_key':'x'}})
+        with self.assertRaises(ValueError):bundle({**doc,'runtime':{'max_context':float('nan')}})
 
 if __name__=='__main__':unittest.main()

@@ -29,14 +29,16 @@ Mock runs carry `simulated: true` and are not performance evidence.
 
 ## The short workflow
 
-1. **Save my settings**: title, optional nickname, optional description. Hardware and
-   tuning details are expandable. Blank tuning fields inherit this server's settings.
+1. **Share my setup**: name, optional nickname and description. GPU(s), CPU, OS, RAM,
+   loaded model, context, engine version, KV format and vision are captured automatically
+   from the same telemetry as Your PC / Model & engine. Manual hardware corrections are opt-in.
+   Tuning details are expandable. Blank tuning fields inherit this server's settings.
 2. **Share file** downloads a JSON bundle. Review its nickname, description and hardware;
    it has no executable, model paths, environment, API keys, hostname or chat history.
    There is no upload. Sharing a bundle is anonymous when the nickname is empty.
 3. **Import file** adds a library entry, without applying anything. Reimporting the same
    normalized bundle is idempotent. Imported numbers remain **reported / unverified**.
-4. Filter by GPU, platform, OS, topology, RAM type/capacity, date, personal rating or favorites.
+4. Browse the full-width grid or list; filter by GPU, single/mixed multi-GPU, OS, date, RAM capacity, personal rating or favorites. Mobile filters collapse behind one button. Open a card for its details and actions.
 5. **Test & compare** measures current settings and the selected preset with the same
    short protocol. New chat/API mutations receive HTTP 409 while the job owns the engine.
    Metrics and job progress remain readable. Cancel stops generation and restores the original
@@ -45,10 +47,28 @@ Mock runs carry `simulated: true` and are not performance evidence.
    settings** returns to the pre-adoption arguments. The private run config is never rewritten;
    restarting the server also returns to that file's settings.
 
+**Share link** embeds the sanitized bundle in a portable URL. It opens an explicit import
+preview; it never applies settings or starts a benchmark. Recipients use their own Strata
+Community origin (adjust host/port if needed). Large configurations use JSON files instead.
+URLs contain the shared metadata, so review names/descriptions before forwarding them.
+No hosted link service is implied.
+
 Favorites and stars are private to this SQLite library, not global community scores.
+Cards show 0 votes or 1 local vote and the personal score; no aggregate community votes
+are fabricated. A future shared backend is needed for independent voter aggregation.
+Cards show dated local paired gains, not a forecast against today's settings. Imported
+results remain unverified; configurations without a local pair show "Gain not measured".
+The benchmark measures a short workload, not every context length.
 A shared benchmark never becomes a local measurement merely by being imported.
 
-## Hardware, unified memory and clusters
+## UI scope
+
+The current UI focuses on discrete GPU and mixed multi-GPU machines. Existing Mac,
+unified-memory and cluster profiles remain in SQLite and the interchange schema for
+compatibility, but are hidden from the main grid and removed from the creation form.
+No existing records are deleted. Unknown memory types are not guessed.
+
+## Interchange compatibility: unified memory and clusters
 
 `rig.gpus` has one entry per card, including heterogeneous GPUs and each card's VRAM.
 NVIDIA/AMD telemetry readers describe the GPUs selected by the existing server, not an
@@ -140,3 +160,7 @@ no backend rebuild was needed. Mac, DGX Spark and physical multi-GPU/cluster exe
 `imagegen-concept.png` is the requested ImageGen exploration from this task. Its illustrated sample
 names, stars and settings are not seeded data or measured results. The implementation follows the
 existing Strata design system instead of replacing it. All new UI is scoped to the Community view.
+
+## UX validation update — 15 October 2026
+
+Automatic capture and safe metadata, numeric JSON deduplication, save/import/export, personal rating, benchmark/restore and API security are covered by the focused suite. Browser QA exercises grid/list, mobile filters, setup capture, portable-link confirmation and a simulated four-request benchmark with restoration. The live GPU benchmark was not repeated for this UI change.

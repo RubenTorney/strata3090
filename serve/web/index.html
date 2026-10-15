@@ -28,7 +28,7 @@
       <svg class="st-icon st-icon--sm"><use href="web/sprite.svg#i-image"/></svg>Images</button>
     <button class="st-tab" role="tab" id="tab-btn-monitor" aria-controls="view-monitor" aria-selected="false" data-tab="monitor">
       <svg class="st-icon st-icon--sm"><use href="web/sprite.svg#i-activity"/></svg>Monitor</button>
-    <button class="st-tab" role="tab" id="tab-btn-community" aria-controls="view-community" aria-selected="false" data-tab="community" hidden><svg class="st-icon st-icon--sm"><use href="web/sprite.svg#i-settings"/></svg>Community</button>
+    <button class="st-tab" role="tab" id="tab-btn-community" aria-controls="view-community" aria-selected="false" data-tab="community" hidden><svg class="st-icon st-icon--sm"><use href="web/sprite.svg#i-community"/></svg>Community</button>
     <button class="st-tab" role="tab" id="tab-btn-about" aria-controls="view-about" aria-selected="false" data-tab="about">
       <svg class="st-icon st-icon--sm"><use href="web/sprite.svg#i-info"/></svg>About</button>
   </nav>
@@ -212,48 +212,45 @@
 
   <section class="view view--community" id="view-community" role="tabpanel" aria-labelledby="tab-btn-community" hidden>
     <div class="co-wrap">
-      <div class="co-heading"><div><h1>Find your best settings</h1><p>Shared configurations. Tested on your hardware.</p></div>
-        <div class="co-actions"><button class="st-btn st-btn--secondary" id="co-import">Import file</button><button class="st-btn st-btn--primary" id="co-create">Save my settings</button><input type="file" accept=".json,application/json" id="co-file" hidden></div></div>
+      <div class="co-heading"><div><h1>Better settings, together</h1><p>Find a setup. Test it on your GPU. Keep what works.</p></div>
+        <div class="co-actions"><button class="st-btn st-btn--secondary" id="co-import">Import file</button><button class="st-btn st-btn--primary" id="co-create">Share my setup</button><input type="file" accept=".json,application/json" id="co-file" hidden></div></div>
       <div class="co-rig" id="co-rig"></div>
       <div id="co-status" role="status" aria-live="polite"></div>
       <div class="co-layout">
         <aside class="st-card co-filters" aria-label="Configuration filters">
           <label>Find a configuration<input class="st-input" id="co-search" placeholder="Name, GPU, author…"></label>
+          <button class="st-btn st-btn--secondary co-filter-toggle" id="co-filter-toggle" aria-expanded="false">Filters</button>
           <label>Graphics card<select class="st-input" id="co-gpu"><option value="">All graphics cards</option></select></label>
-          <label>GPU setup<select class="st-input" id="co-topology"><option value="">Any GPU setup</option><option value="single">Single GPU</option><option value="multi">Multi-GPU</option><option value="mixed">Mixed GPU models</option><option value="cluster">Multi-node cluster</option><option value="unified">Unified memory</option></select></label>
-          <label>Platform<select class="st-input" id="co-platform"><option value="">All platforms</option><option>PC / workstation</option><option>Mac mini</option><option>Mac Studio</option><option>DGX Spark</option><option>Server</option><option>Other</option></select></label>
-          <label>RAM type<select class="st-input" id="co-ram-type"><option value="">Any memory type</option><option>DDR3</option><option>DDR4</option><option>DDR5</option><option>LPDDR4</option><option>LPDDR4X</option><option>LPDDR5</option><option>LPDDR5X</option><option>Mixed</option><option>Unknown</option><option>Other</option></select></label>
-          <label>Operating system<select class="st-input" id="co-os"><option value="">All systems</option><option>Linux</option><option>Windows</option><option>macOS</option></select></label>
+          <label>GPU setup<select class="st-input" id="co-topology"><option value="">Any GPU setup</option><option value="single">Single GPU</option><option value="multi">Multi-GPU</option><option value="mixed">Mixed GPU models</option></select></label>
+          <label>Operating system<select class="st-input" id="co-os"><option value="">All systems</option><option>Linux</option><option>Windows</option></select></label>
           <details class="co-more"><summary>More filters</summary><label>Minimum personal rating<select class="st-input" id="co-rating"><option value="0">Any rating</option><option value="3">3+ stars</option><option value="4">4+ stars</option><option value="5">5 stars</option></select></label>
           <label>Published after<input class="st-input" id="co-date" type="date"></label>
-          <label>Maximum RAM per node (GiB)<input class="st-input" id="co-ram" type="number" min="1" placeholder="Any"></label>
+          <label>Maximum RAM (GiB)<input class="st-input" id="co-ram" type="number" min="1" placeholder="Any"></label>
           <label>Sort by<select class="st-input" id="co-sort"><option value="newest">Newest first</option><option value="rating">My rating</option><option value="speed">Reported generation</option></select></label>
           </details><label><span><input id="co-favorites" type="checkbox"> Favorites only</span></label>
           <button class="st-btn st-btn--secondary" id="co-reset">Reset filters</button>
         </aside>
-        <div><p class="co-note" id="co-count"></p><div class="co-list" id="co-list"></div></div>
-        <aside class="st-card co-detail" id="co-detail"><h2>A useful starting point</h2><p class="co-note">Save your current settings or import a shared JSON file. No account or online service required.</p></aside>
+        <div class="co-results"><div class="co-results-head"><p class="co-note" id="co-count"></p><div class="co-actions" role="group" aria-label="Configuration layout"><button class="st-btn st-btn--secondary" id="co-grid" aria-pressed="true">Grid</button><button class="st-btn st-btn--secondary" id="co-rows" aria-pressed="false">List</button></div></div><div class="co-list" id="co-list"></div></div>
       </div>
-      <section class="st-card co-comparison" id="co-comparison"><h2>Your local comparison</h2><p class="co-note">Run a comparison to measure generation, time to first token and sampled memory peaks on this PC.</p></section>
+      <dialog class="co-dialog co-inspector" id="co-inspector"><button class="st-btn st-btn--secondary co-dismiss" id="co-dismiss" aria-label="Close configuration">Close ×</button><div class="co-detail" id="co-detail"></div><section class="co-comparison" id="co-comparison"></section></dialog>
       <details class="co-catalog"><summary>GPU reference catalog · manufacturer sources</summary><p class="co-note">Reference specifications, not a guarantee of engine support. PCIe and SXM variants are distinct.</p><ul id="co-catalog"></ul></details>
     </div>
   </section>
   <dialog class="co-dialog" id="co-editor"><form class="co-form" id="co-form">
-    <h2>Save a configuration</h2><p class="co-note">Only these tuning values are saved. No executable, local paths, API keys or environment variables.</p>
+    <h2>Share your setup</h2><p class="co-note">Your GPUs, PC, loaded model and current tuning are detected automatically. Just give this setup a name.</p><div class="co-autofill" id="co-autofill"></div>
     <label>Name<input class="st-input" id="co-title" maxlength="80" required placeholder="My balanced setup"></label>
     <label>Nickname (optional)<input class="st-input" id="co-author" maxlength="40" placeholder="Anonymous"></label>
     <label>Description<input class="st-input" id="co-description" maxlength="500" placeholder="What works well for this rig?"></label>
-    <details><summary>Hardware · check before sharing</summary><p class="co-note">One row per GPU used by Strata, including mixed models. Unknown RAM type is not inferred. Hardware fields are descriptive; importing them never changes device selection.</p>
-    <div class="co-knobs"><label>Platform<select class="st-input" id="co-edit-platform"></select></label><label>Memory architecture<select class="st-input" id="co-edit-memory"></select></label><label>System<select class="st-input" id="co-edit-os"><option>Linux</option><option>Windows</option><option>macOS</option><option>Unknown</option></select></label></div>
+    <details><summary>Correct detected hardware (optional)</summary><label><span><input type="checkbox" id="co-override"> Use my manual corrections</span></label><p class="co-note">One row per GPU used by Strata, including mixed models. Unknown RAM type is not inferred. Hardware fields are descriptive; importing them never changes device selection.</p>
+    <label>System<select class="st-input" id="co-edit-os"><option>Linux</option><option>Windows</option><option>Unknown</option></select></label>
     <div id="co-edit-gpus"></div><datalist id="co-gpu-options"></datalist><button class="st-btn st-btn--secondary" id="co-add-gpu" type="button">Add GPU</button>
-    <div class="co-knobs"><label>Installed RAM (GiB)<input class="st-input" id="co-edit-ram" type="number" min="1" max="8192" step="any"></label><label>Memory type<select class="st-input" id="co-edit-ram-type"></select></label></div>
+    <div class="co-knobs"><label>System RAM (GiB)<input class="st-input" id="co-edit-ram" type="number" min="1" max="8192" step="any"></label><label>Memory type<select class="st-input" id="co-edit-ram-type"></select></label></div>
     </details>
-    <details><summary>Cluster (optional)</summary><p class="co-note">Describe every node group, including the first machine. Memory is per node, never automatically pooled. This V0 benchmarks only the connected Strata server; it does not launch or coordinate remote nodes.</p><div id="co-edit-nodes"></div><button class="st-btn st-btn--secondary" type="button" id="co-add-node">Add node group</button><label>Interconnect<input class="st-input" id="co-edit-interconnect" maxlength="80" placeholder="e.g. ConnectX-7 · 200 Gb/s or 10 GbE"></label></details>
     <details><summary>Tuning settings</summary><p class="co-note">Blank means inherit this PC's current setting. Changes require an engine restart during the test.</p><div class="co-knobs" id="co-knobs"></div></details>
     <p class="co-note">You can review the exported file before sharing. Names and descriptions are public if you share them.</p>
     <div class="co-actions"><button class="st-btn st-btn--secondary" type="button" id="co-close">Cancel</button><button class="st-btn st-btn--primary" type="submit">Save configuration</button></div>
   </form></dialog>
-
+  <dialog class="co-dialog" id="co-share-dialog"><h2>Share configuration</h2><p class="co-note">This portable link contains the public configuration, not your local paths or credentials. The recipient uses their own Strata Community server (adjust the host and port if needed). Review it before sharing.</p><label>Configuration link<textarea class="st-input" id="co-share-text" readonly rows="5"></textarea></label><div class="co-actions"><button class="st-btn st-btn--secondary" id="co-share-close">Close</button><button class="st-btn st-btn--primary" id="co-copy">Copy link</button></div></dialog>
 </main>
 
 <!-- ============================ Sampling drawer ============================ -->

@@ -39,12 +39,16 @@ Mock runs carry `simulated: true` and are not performance evidence.
 3. **Import file** adds a library entry, without applying anything. Reimporting the same
    normalized bundle is idempotent. Imported numbers remain **reported / unverified**.
 4. Browse the full-width grid or list; filter by GPU, single/mixed multi-GPU, OS, date, RAM capacity, personal rating or favorites. Mobile filters collapse behind one button. Open a card for its details and actions.
-5. **Test & compare** measures current settings and the selected preset with the same
-   short protocol. New chat/API mutations receive HTTP 409 while the job owns the engine.
-   Metrics and job progress remain readable. Cancel stops generation and restores the original
-   settings; a restart already in progress must finish first.
-6. **Use for this session** applies the tuning through an engine restart. **Restore previous
-   settings** returns to the pre-adoption arguments. The private run config is never rewritten;
+5. **Test & compare** opens the benchmark desk: choose a repository scenario, run it,
+   and inspect latency, throughput and memory charts alongside every request's token counts.
+   **Pause** takes effect between requests. **Resume** continues the same run; **Stop & restore**
+   cancels and restores the original settings. A restart already in progress must finish first.
+   New chat/API mutations receive HTTP 409 while the job owns the engine, including when paused.
+   Metrics and job progress remain readable. Closing the window does not stop a benchmark.
+6. **Load configuration** applies the tuning through an engine restart. **Undo configuration**
+   returns to the immediately preceding configuration (one undo level). **Reload model** restarts
+   the current model with its current settings. Refresh only updates the library view.
+   The private run config is never rewritten;
    restarting the server also returns to that file's settings.
 
 **Share link** embeds the sanitized bundle in a portable URL. It opens an explicit import
@@ -58,7 +62,8 @@ Cards show 0 votes or 1 local vote and the personal score; no aggregate communit
 are fabricated. A future shared backend is needed for independent voter aggregation.
 Cards show dated local paired gains, not a forecast against today's settings. Imported
 results remain unverified; configurations without a local pair show "Gain not measured".
-The benchmark measures a short workload, not every context length.
+Cards label the request used for their displayed paired gain; the full run is in the benchmark desk.
+No result is extrapolated to unmeasured workloads or contexts.
 A shared benchmark never becomes a local measurement merely by being imported.
 
 ## UI scope
@@ -102,6 +107,41 @@ model, quantization, context size, device selection, layer split, executable, pa
 environment, stay those of the local server. This is a tuning-preset format, not a portable
 installer or a complete machine config. A different model name cannot be applied.
 
+### Built-in benchmark desk
+
+| Scenario | Actual implementation | Measured requests per setup |
+| --- | --- | --- |
+| Quick code, cold / warm | `serve/community.py` | 2, capped at 128 output tokens |
+| Repository short questions | `tools/strata_bench.py`, `Suite.run_chat` | 3, capped at 100 tokens |
+| Repository context 4K / 16K | `Suite.run_prompt` | 2, capped at 24 tokens |
+| Repository six coding turns | `Suite.agent_session` | 6, capped at 64 tokens |
+
+The repository scenarios execute the existing suite methods, including its warm-up, prompt-length
+calibration, word-list generator and document fixtures. A transport injection calls the same server
+preparation/generation path while the Community worker owns the engine. It does not launch a shell,
+another model process, a user-provided script, or model-proposed tools. The standalone CLI benchmark
+still uses HTTP by default with its original three repetitions; Community uses **one pass per setup**.
+Its timings exclude HTTP transport and therefore should not be presented as a complete CLI report.
+
+Both setups restart independently. Fixed tags are shared between arms; unrelated short/long requests
+get distinct tags. An agent session continues from each arm's own previous answers, so continuation
+lengths and output quality can differ. Context checks reject 4K/16K below 16,664 configured tokens and
+agent sessions below 10,240; actual overflow or generation failure aborts and restores the original.
+Warm-up and calibration requests do not count in the progress total or result charts. Pauses occur
+outside request timers and retain cache state. Restarts and pauses may take longer than generation;
+the displayed request-time sum is not total elapsed benchmark time.
+
+Completed comparisons are stored in SQLite (the last 100 are shown), with original/effective tuning,
+protocol, source, actual input/output/reused tokens, response hashes and sampled memory. Export results
+downloads that local comparison as JSON. Failed/cancelled partial runs do not appear as successful
+measurements. Shared bundles can carry a completed local run but are still unverified when imported.
+Charts use a common zero baseline per metric and show missing values as unavailable. Percentage deltas
+require real measurements with matching protocol and prompt lengths. A single pass is a smoke test,
+not statistical evidence for a new default, and none of these checks grades answer quality.
+
+The catalog is an allow-list of these four scenarios. It does not expose arbitrary commands, a
+stress test, concurrency testing, model downloads or a new model selector.
+
 Protocol `strata-community-code-v1`:
 
 - One fixed Python-code prompt, greedy sampling, seed 42, thinking off, 128 output tokens maximum.
@@ -136,12 +176,13 @@ access, server-side rate limits and provenance; do not treat today's personal st
 ## Validation
 
 ```sh
-python -m unittest serve.test_community serve.test_runconfig serve.test_security serve.test_lifecycle serve.test_server -q
+python -m unittest serve.test_community serve.test_runconfig serve.test_security serve.test_lifecycle serve.test_server tools.test_strata_bench -q
 ```
 
-The first full regression pass completed **359 tests** (before the final cluster-only additions).
-The final focused suite passed **12 tests**, covering heterogeneous rigs, unified-memory node groups, rejected nested clusters,
-forbidden remote-address fields and concurrent preference updates.
+The latest regression pass completed **389 tests**. The Community tests cover metadata/import/export,
+heterogeneous rigs, invalid inputs, auth/CSRF, all three repository scenarios, pause/resume/cancel,
+exclusive admission, restoration and one-level undo. The CLI benchmark's existing tests also pass
+after transport injection. Earlier 359/368-test counts refer to earlier revisions, not this one.
 
 Real smoke test on 2026-10-15: RTX 3090 24 GiB, Ryzen 5 5600X, 64 GiB DDR4,
 Qwen3.8-Flash-Next IQ3_S, upstream 0.1.44 binary, configured context 262,144.
@@ -164,3 +205,22 @@ existing Strata design system instead of replacing it. All new UI is scoped to t
 ## UX validation update — 15 October 2026
 
 Automatic capture and safe metadata, numeric JSON deduplication, save/import/export, personal rating, benchmark/restore and API security are covered by the focused suite. Browser QA exercises grid/list, mobile filters, setup capture, portable-link confirmation and a simulated four-request benchmark with restoration. The live GPU benchmark was not repeated for this UI change.
+
+## Benchmark desk validation — 15 October 2026
+
+The desk adds repository-scenario selection, request-by-request bar charts, history and JSON download,
+pause/resume/stop controls, reload and one-level undo. Browser checks covered save → export → reimport
+(no duplicate), favorites/rating, GPU filters, layout persistence, pause/resume, cancel, load/undo,
+and chart metric changes. Layouts checked at 1440×1000, 390×844 and 320×740, in light/dark themes;
+the small-screen dialog stays within the viewport and detailed tables scroll inside their container.
+
+A separate real RTX 3090 check completed the repository short-chat comparison: **3 measured requests
+per setup**, after each arm's warm-up, **100 output tokens each**. Cache slots 6 versus 2, all other
+calibrated settings retained. Baseline/candidate generation rates by question: 114.9/115.6,
+89.5/92.1 and 92.7/95.8 tok/s; first-token waits: 0.644/0.638, 0.505/0.459 and 0.468/0.459 seconds.
+Only the code answer's hashes matched; the other two answers differed. These are functional smoke
+measurements, **not** a cache-setting recommendation or a quality comparison. The original 6-slot
+configuration was restored; context 262,144 and vision remained enabled.
+Raw records: [validation-benchmark-desk-rtx3090.json](validation-benchmark-desk-rtx3090.json).
+The context and agent adapters were exercised with the mock engine; no new real long-context,
+vision, Windows, AMD or physical multi-GPU benchmark was run for this change.

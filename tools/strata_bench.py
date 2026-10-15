@@ -222,8 +222,11 @@ def pctl(values, p):
 
 # ---------------------------------------------------------------------------------------------------- the suite
 class Suite:
-    def __init__(self, base, key, ctx, runs, think, log=print, want_clients=0, want_long=False, quick=False):
+    def __init__(self, base, key, ctx, runs, think, log=print, want_clients=0, want_long=False, quick=False, request=None):
         self.base, self.key, self.ctx, self.runs, self.think, self.log = base, key, ctx, runs, think, log
+        # Community uses the same suite with an in-process transport while it owns the engine.
+        # The command-line benchmark keeps the original HTTP transport and defaults.
+        self.request = request or chat
         self.clients, self.want_long = want_clients, want_long
         self.quick = quick
         self.nonce = str(int(time.time()))
@@ -242,7 +245,7 @@ class Suite:
         slope, so the template's fixed part does not skew it."""
         pts = []
         for words in (200, 800):
-            r = digest(chat(self.base, self.key, [{"role": "user", "content": f"[{self.tag('cal', words)}]\n" + long_prompt(words)}], 1))
+            r = digest(self.request(self.base, self.key, [{"role": "user", "content": f"[{self.tag('cal', words)}]\n" + long_prompt(words)}], 1))
             pts.append(r.get("prompt_tokens"))
         slope = (pts[1] - pts[0]) / 600 if all(pts) and pts[1] > pts[0] else None
         self.tokens_per_word = slope or 1.1
@@ -255,16 +258,16 @@ class Suite:
 
     def warm_up(self):
         self.log("warming up (not measured) ...")
-        chat(self.base, self.key, [{"role": "user", "content": PROMPTS[0]}], 24, self.think)
+        self.request(self.base, self.key, [{"role": "user", "content": PROMPTS[0]}], 24, self.think)
         self.calibrate()
-        chat(self.base, self.key, self.prompt_for(1024, -1), 8, self.think)
+        self.request(self.base, self.key, self.prompt_for(1024, -1), 8, self.think)
 
     def run_chat(self):
         self.log(f"chat: {len(PROMPTS)} short questions x {self.runs} runs, up to {CHAT_MAX_TOKENS} new tokens")
         rows = []
         for run in range(self.runs):
             for i, p in enumerate(PROMPTS):
-                d = digest(chat(self.base, self.key, [{"role": "user", "content": f"[{self.tag(run, i, 'c')}] {p}"}],
+                d = digest(self.request(self.base, self.key, [{"role": "user", "content": f"[{self.tag(run, i, 'c')}] {p}"}],
                                 CHAT_MAX_TOKENS, self.think))
                 d.update(run=run, prompt=i)
                 rows.append(d)
@@ -286,7 +289,7 @@ class Suite:
         self.log(f"{label} prompt: {self.runs} fresh prompts of about {tokens} tokens, {LONG_MAX_TOKENS} new tokens")
         rows = []
         for run in range(self.runs):
-            d = digest(chat(self.base, self.key, self.prompt_for(tokens, run), LONG_MAX_TOKENS, self.think))
+            d = digest(self.request(self.base, self.key, self.prompt_for(tokens, run), LONG_MAX_TOKENS, self.think))
             d["run"] = run
             rows.append(d)
             if not d["ok"]:
@@ -327,7 +330,7 @@ class Suite:
             if t > 0:
                 rel, body = files[t - 1]
                 msgs.append({"role": "user", "content": f"File {rel}:\n{body}\n\nWhat is this file for? Two sentences."})
-            r = chat(self.base, self.key, msgs, AGENT_MAX_TOKENS, self.think, tools=TOOLS)
+            r = self.request(self.base, self.key, msgs, AGENT_MAX_TOKENS, self.think, tools=TOOLS)
             d = digest(r)
             d.update(run=run, turn=t)
             turns.append(d)

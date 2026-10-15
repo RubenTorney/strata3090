@@ -215,10 +215,11 @@
       <div class="co-heading"><div><h1>Better settings, together</h1><p>Find a setup. Test it on your GPU. Keep what works.</p></div>
         <div class="co-actions"><button class="st-btn st-btn--secondary" id="co-import">Import file</button><button class="st-btn st-btn--primary" id="co-create">Share my setup</button><input type="file" accept=".json,application/json" id="co-file" hidden></div></div>
       <div class="co-rig" id="co-rig"></div>
+      <div class="co-session"><div><span class="co-eyebrow">CURRENT SESSION</span><strong id="co-session-name">Loaded model</strong></div><div class="co-actions"><button class="st-btn st-btn--primary" id="co-open-bench">Benchmarks & history</button><button class="st-btn st-btn--secondary" id="co-reload">Reload model</button><button class="st-btn st-btn--secondary" id="co-undo" hidden>Undo configuration</button><button class="st-btn st-btn--secondary" id="co-refresh" aria-label="Refresh community">↻</button></div></div>
       <div id="co-status" role="status" aria-live="polite"></div>
       <div class="co-layout">
         <aside class="st-card co-filters" aria-label="Configuration filters">
-          <label>Find a configuration<input class="st-input" id="co-search" placeholder="Name, GPU, author…"></label>
+          <label>Find a configuration<input class="st-input" id="co-search" type="search" placeholder="Name, GPU, author…"></label>
           <button class="st-btn st-btn--secondary co-filter-toggle" id="co-filter-toggle" aria-expanded="false">Filters</button>
           <label>Graphics card<select class="st-input" id="co-gpu"><option value="">All graphics cards</option></select></label>
           <label>GPU setup<select class="st-input" id="co-topology"><option value="">Any GPU setup</option><option value="single">Single GPU</option><option value="multi">Multi-GPU</option><option value="mixed">Mixed GPU models</option></select></label>
@@ -232,25 +233,33 @@
         </aside>
         <div class="co-results"><div class="co-results-head"><p class="co-note" id="co-count"></p><div class="co-actions" role="group" aria-label="Configuration layout"><button class="st-btn st-btn--secondary" id="co-grid" aria-pressed="true">Grid</button><button class="st-btn st-btn--secondary" id="co-rows" aria-pressed="false">List</button></div></div><div class="co-list" id="co-list"></div></div>
       </div>
-      <dialog class="co-dialog co-inspector" id="co-inspector"><button class="st-btn st-btn--secondary co-dismiss" id="co-dismiss" aria-label="Close configuration">Close ×</button><div class="co-detail" id="co-detail"></div><section class="co-comparison" id="co-comparison"></section></dialog>
+      <dialog class="co-dialog co-inspector" id="co-inspector" aria-labelledby="co-detail-title"><header class="co-inspector-head"><span class="co-eyebrow">CONFIGURATION</span><button class="st-btn st-btn--secondary" id="co-dismiss" aria-label="Close configuration">Close ×</button></header><div id="co-modal-status" role="status" aria-live="polite"></div><div class="co-detail" id="co-detail"></div><section class="co-comparison" id="co-comparison"></section></dialog>
       <details class="co-catalog"><summary>GPU reference catalog · manufacturer sources</summary><p class="co-note">Reference specifications, not a guarantee of engine support. PCIe and SXM variants are distinct.</p><ul id="co-catalog"></ul></details>
     </div>
   </section>
-  <dialog class="co-dialog" id="co-editor"><form class="co-form" id="co-form">
-    <h2>Share your setup</h2><p class="co-note">Your GPUs, PC, loaded model and current tuning are detected automatically. Just give this setup a name.</p><div class="co-autofill" id="co-autofill"></div>
+  <dialog class="co-dialog" id="co-editor" aria-labelledby="co-editor-title"><form class="co-form" id="co-form">
+    <h2 id="co-editor-title">Share your setup</h2><p class="co-note">Your GPUs, PC, loaded model and current tuning are detected automatically. Just give this setup a name.</p><div class="co-autofill" id="co-autofill"></div>
     <label>Name<input class="st-input" id="co-title" maxlength="80" required placeholder="My balanced setup"></label>
     <label>Nickname (optional)<input class="st-input" id="co-author" maxlength="40" placeholder="Anonymous"></label>
     <label>Description<input class="st-input" id="co-description" maxlength="500" placeholder="What works well for this rig?"></label>
     <details><summary>Correct detected hardware (optional)</summary><label><span><input type="checkbox" id="co-override"> Use my manual corrections</span></label><p class="co-note">One row per GPU used by Strata, including mixed models. Unknown RAM type is not inferred. Hardware fields are descriptive; importing them never changes device selection.</p>
-    <label>System<select class="st-input" id="co-edit-os"><option>Linux</option><option>Windows</option><option>Unknown</option></select></label>
+    <fieldset id="co-hardware-fields" disabled><label>System<select class="st-input" id="co-edit-os"><option>Linux</option><option>Windows</option><option>Unknown</option></select></label>
     <div id="co-edit-gpus"></div><datalist id="co-gpu-options"></datalist><button class="st-btn st-btn--secondary" id="co-add-gpu" type="button">Add GPU</button>
-    <div class="co-knobs"><label>System RAM (GiB)<input class="st-input" id="co-edit-ram" type="number" min="1" max="8192" step="any"></label><label>Memory type<select class="st-input" id="co-edit-ram-type"></select></label></div>
+    <div class="co-knobs"><label>System RAM (GiB)<input class="st-input" id="co-edit-ram" type="number" min="1" max="8192" step="any"></label><label>Memory type<select class="st-input" id="co-edit-ram-type"></select></label></div></fieldset>
     </details>
     <details><summary>Tuning settings</summary><p class="co-note">Blank means inherit this PC's current setting. Changes require an engine restart during the test.</p><div class="co-knobs" id="co-knobs"></div></details>
     <p class="co-note">You can review the exported file before sharing. Names and descriptions are public if you share them.</p>
-    <div class="co-actions"><button class="st-btn st-btn--secondary" type="button" id="co-close">Cancel</button><button class="st-btn st-btn--primary" type="submit">Save configuration</button></div>
+    <div class="co-actions"><button class="st-btn st-btn--secondary" type="button" id="co-close">Cancel</button><button class="st-btn st-btn--primary" type="submit" id="co-submit">Save configuration</button></div>
   </form></dialog>
-  <dialog class="co-dialog" id="co-share-dialog"><h2>Share configuration</h2><p class="co-note">This portable link contains the public configuration, not your local paths or credentials. The recipient uses their own Strata Community server (adjust the host and port if needed). Review it before sharing.</p><label>Configuration link<textarea class="st-input" id="co-share-text" readonly rows="5"></textarea></label><div class="co-actions"><button class="st-btn st-btn--secondary" id="co-share-close">Close</button><button class="st-btn st-btn--primary" id="co-copy">Copy link</button></div></dialog>
+  <dialog class="co-dialog" id="co-share-dialog" aria-labelledby="co-share-title"><h2 id="co-share-title">Share configuration</h2><p class="co-note">This portable link contains the public configuration, not your local paths or credentials. The recipient uses their own Strata Community server (adjust the host and port if needed). Review it before sharing.</p><label>Configuration link<textarea class="st-input" id="co-share-text" readonly rows="5"></textarea></label><div class="co-actions"><button class="st-btn st-btn--secondary" id="co-share-close">Close</button><button class="st-btn st-btn--primary" id="co-copy">Copy link</button></div></dialog>
+  <dialog class="co-dialog co-workbench" id="bw-dialog" aria-labelledby="bw-title">
+    <header class="co-inspector-head"><div><span class="co-eyebrow">TEST · COMPARE · REPEAT</span><h2 id="bw-title">Benchmarks</h2></div><button class="st-btn st-btn--secondary" id="bw-close" aria-label="Close benchmarks">Close ×</button></header>
+    <div class="bw-setup"><label>Configuration to compare<select class="st-input" id="bw-config"></select></label><label>Benchmark<select class="st-input" id="bw-suite"></select></label></div>
+    <p class="co-note" id="bw-description"></p>
+    <div class="co-actions bw-actions"><button class="st-btn st-btn--primary" id="bw-start">Run comparison</button><button class="st-btn st-btn--secondary" id="bw-load">Load configuration</button><button class="st-btn st-btn--secondary" id="bw-undo" hidden>Undo configuration</button><button class="st-btn st-btn--secondary" id="bw-pause" hidden>Pause</button><button class="st-btn st-btn--secondary" id="bw-stop" hidden>Stop & restore</button></div>
+    <div id="bw-status" role="status" aria-live="polite"></div>
+    <section class="bw-results"><div class="bw-results-head"><label>Saved comparisons<select class="st-input" id="bw-history"></select></label><button class="st-btn st-btn--secondary" id="bw-export">Export results</button></div><div id="bw-report"></div></section>
+  </dialog>
 </main>
 
 <!-- ============================ Sampling drawer ============================ -->
@@ -307,6 +316,7 @@
 <div class="scrim" id="scrim" hidden></div>
 <div class="st-toasts" id="toasts" aria-live="polite"></div>
 <script src="web/app.js"></script>
+<script src="web/community-bench.js"></script>
 <script src="web/community.js"></script>
 </body>
 </html>

@@ -1,0 +1,197 @@
+{
+  "purpose": "Functional smoke test of the repository short-chat adapter; one pass, not evidence for a new tuning default.",
+  "engine": "Upstream 0.1.44; calibrated; 262144 configured context; vision enabled.",
+  "limits": "Short text workload only. No long-context/vision workload in this pass, no GPU clock capture. Not a quality score.",
+  "run": {
+    "id": "54b31eb78c7e486ca469cdeabe295f50",
+    "config_id": "e7217dcc9b6944738c1c6c4de12686f4",
+    "created": "2026-10-15T16:30:31+00:00",
+    "rig": {
+      "os": "Linux",
+      "cpu": "AMD Ryzen 5 5600X 6-Core Processor",
+      "platform": "PC / workstation",
+      "memory_architecture": "Unknown",
+      "interconnect": "Unknown",
+      "nodes": [],
+      "ram_type": "DDR4",
+      "ram_gib": 62.70704650878906,
+      "gpus": [
+        {
+          "name": "NVIDIA GeForce RTX 3090",
+          "vram_gib": 24.0
+        }
+      ],
+      "gpu": "NVIDIA GeForce RTX 3090",
+      "vram_gib": 24.0
+    },
+    "model": "qwen3.8-flash-next-iq3_s",
+    "runtime": {
+      "version": "0.1.44",
+      "max_context": 262144,
+      "kv": "int8",
+      "images": true,
+      "expert_slots": 8248,
+      "pool_workers": 5,
+      "cores": 6,
+      "threads": 12
+    },
+    "protocol": "strata-repo-chat-v1",
+    "benchmark": "chat",
+    "source": "tools/strata_bench.py \u00b7 Suite.run_chat",
+    "passes": 1,
+    "baseline_settings": {
+      "--spec": 4,
+      "--pcie-frac": 0.35,
+      "--spec-min-p": 0.7,
+      "--adapt-every": 1,
+      "--adapt-swaps": 80,
+      "--adapt-decay": 0.97,
+      "--prompt-cache": 6
+    },
+    "effective_settings": {
+      "--adapt-decay": 0.97,
+      "--adapt-every": 1,
+      "--adapt-swaps": 80,
+      "--pcie-frac": 0.35,
+      "--prompt-cache": 2,
+      "--spec": 4,
+      "--spec-min-p": 0.7
+    },
+    "baseline": [
+      {
+        "ttft_s": 0.6444412319979165,
+        "decode_tok_s": 114.9,
+        "output_tokens": 100,
+        "prompt_tokens": 68,
+        "duration_s": 1.5025835809938144,
+        "ram_peak_gib": 56.381065368652344,
+        "vram_peak_gib": 23.67864990234375,
+        "reused_tokens": 0,
+        "read_tokens": 68,
+        "prompt_tok_s": 108.2,
+        "gpu_peaks": [
+          {
+            "index": 0,
+            "peak_gib": 23.67864990234375
+          }
+        ],
+        "answer_sha256": "4dfde1081f5afe21b1290524e3cf8021dc497eacef478bcf8cfdcd043be3d1f5",
+        "simulated": false,
+        "protocol": "strata-repo-chat-v1",
+        "phase": "chat-1"
+      },
+      {
+        "ttft_s": 0.504516810993664,
+        "decode_tok_s": 89.5,
+        "output_tokens": 100,
+        "prompt_tokens": 60,
+        "duration_s": 1.6081637559982482,
+        "ram_peak_gib": 56.39625930786133,
+        "vram_peak_gib": 23.6849365234375,
+        "reused_tokens": 0,
+        "read_tokens": 60,
+        "prompt_tok_s": 124.3,
+        "gpu_peaks": [
+          {
+            "index": 0,
+            "peak_gib": 23.6849365234375
+          }
+        ],
+        "answer_sha256": "747549a95f69e41fff78b5588f213c447e2c3d6e555f0286f3f664d5389f9816",
+        "simulated": false,
+        "protocol": "strata-repo-chat-v1",
+        "phase": "chat-2"
+      },
+      {
+        "ttft_s": 0.4680893080076203,
+        "decode_tok_s": 92.7,
+        "output_tokens": 100,
+        "prompt_tokens": 63,
+        "duration_s": 1.533881718001794,
+        "ram_peak_gib": 56.398441314697266,
+        "vram_peak_gib": 23.6849365234375,
+        "reused_tokens": 0,
+        "read_tokens": 63,
+        "prompt_tok_s": 140.8,
+        "gpu_peaks": [
+          {
+            "index": 0,
+            "peak_gib": 23.6849365234375
+          }
+        ],
+        "answer_sha256": "b5385df629385578a9b53b3992c7ea363c9bf135cb18973a3301a14059de85aa",
+        "simulated": false,
+        "protocol": "strata-repo-chat-v1",
+        "phase": "chat-3"
+      }
+    ],
+    "candidate": [
+      {
+        "ttft_s": 0.6381345289992169,
+        "decode_tok_s": 115.6,
+        "output_tokens": 100,
+        "prompt_tokens": 68,
+        "duration_s": 1.4902928179944865,
+        "ram_peak_gib": 56.433624267578125,
+        "vram_peak_gib": 23.71734619140625,
+        "reused_tokens": 0,
+        "read_tokens": 68,
+        "prompt_tok_s": 109.2,
+        "gpu_peaks": [
+          {
+            "index": 0,
+            "peak_gib": 23.71734619140625
+          }
+        ],
+        "answer_sha256": "4dfde1081f5afe21b1290524e3cf8021dc497eacef478bcf8cfdcd043be3d1f5",
+        "simulated": false,
+        "protocol": "strata-repo-chat-v1",
+        "phase": "chat-1"
+      },
+      {
+        "ttft_s": 0.458832068979973,
+        "decode_tok_s": 92.1,
+        "output_tokens": 100,
+        "prompt_tokens": 60,
+        "duration_s": 1.5313983089872636,
+        "ram_peak_gib": 56.44985580444336,
+        "vram_peak_gib": 23.73004150390625,
+        "reused_tokens": 0,
+        "read_tokens": 60,
+        "prompt_tok_s": 135.4,
+        "gpu_peaks": [
+          {
+            "index": 0,
+            "peak_gib": 23.73004150390625
+          }
+        ],
+        "answer_sha256": "b0b150bbf68097f8a0c748f04a0c2d2c15908822812c877a98bdd9dd86eff7b9",
+        "simulated": false,
+        "protocol": "strata-repo-chat-v1",
+        "phase": "chat-2"
+      },
+      {
+        "ttft_s": 0.4592640089977067,
+        "decode_tok_s": 95.8,
+        "output_tokens": 100,
+        "prompt_tokens": 63,
+        "duration_s": 1.4900945029803552,
+        "ram_peak_gib": 56.45107650756836,
+        "vram_peak_gib": 23.73004150390625,
+        "reused_tokens": 0,
+        "read_tokens": 63,
+        "prompt_tok_s": 142.2,
+        "gpu_peaks": [
+          {
+            "index": 0,
+            "peak_gib": 23.73004150390625
+          }
+        ],
+        "answer_sha256": "71a2ce588491468b19d20c34dd0a2899f5d6209c169ea909fc7f977e053a1e24",
+        "simulated": false,
+        "protocol": "strata-repo-chat-v1",
+        "phase": "chat-3"
+      }
+    ]
+  }
+}

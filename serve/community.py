@@ -16,6 +16,20 @@ from pathlib import Path
 LIMIT = 128 * 1024
 PROTOCOL = "strata-community-code-v1"
 PROMPT = "Write a Python function merge_intervals(intervals) with type hints and three assert examples. Return code only."
+BENCHMARKS = {
+    "quick": {"title": "Quick code · cold / warm", "protocol": PROTOCOL, "requests": 2,
+              "source": "serve/community.py", "description": "Two identical code requests per setup; 128 output tokens each. Fresh engine, then repeated prompt."},
+    "chat": {"title": "Repository · short questions", "protocol": "strata-repo-chat-v1", "requests": 3,
+             "source": "tools/strata_bench.py · Suite.run_chat", "description": "The repository's three short questions, 100 output tokens each; one pass after warm-up."},
+    "context": {"title": "Repository · context 4K / 16K", "protocol": "strata-repo-context-v1", "requests": 2,
+                "source": "tools/strata_bench.py · Suite.run_prompt", "description": "Fresh 4K and 16K prompts, 24 output tokens; one pass after warm-up. Requires at least 17K context."},
+    "agent": {"title": "Repository · six coding turns", "protocol": "strata-repo-agent-v1", "requests": 6,
+              "source": "tools/strata_bench.py · Suite.agent_session", "description": "A six-turn code session using repository documents; 64 output tokens per turn. Requires at least 10K context."},
+}
+PROTOCOL_PHASES = {
+    PROTOCOL: ("cold", "warm"), "strata-repo-chat-v1": ("chat-1", "chat-2", "chat-3"),
+    "strata-repo-context-v1": ("4K", "16K"), "strata-repo-agent-v1": tuple(f"turn-{i}" for i in range(6)),
+}
 # Only tuning flags with numeric/enum arguments. No paths, commands, model loading or env overrides.
 KNOBS = {
     "--pcie-frac": (0, 1, False), "--spec": (0, 8, True), "--spec-min-p": (0, 1, False),
@@ -186,10 +200,10 @@ def validate_runtime(raw):
 
 def validate_result(r):
     keys = {"protocol", "phase", "ttft_s", "decode_tok_s", "ram_peak_gib", "vram_peak_gib", "output_tokens",
-            "prompt_tokens", "duration_s", "answer_sha256", "simulated", "gpu_peaks"}
-    if not isinstance(r, dict) or set(r) - keys or r.get("protocol") != PROTOCOL or r.get("phase") not in ("cold", "warm"):
+            "prompt_tokens", "duration_s", "answer_sha256", "simulated", "gpu_peaks", "reused_tokens", "read_tokens", "prompt_tok_s"}
+    if not isinstance(r, dict) or set(r) - keys or r.get("protocol") not in PROTOCOL_PHASES or r.get("phase") not in PROTOCOL_PHASES[r["protocol"]]:
         raise ValueError("Unsupported measurement protocol")
-    out = {"protocol": PROTOCOL, "phase": r["phase"], "simulated": r.get("simulated", False)}
+    out = {"protocol": r["protocol"], "phase": r["phase"], "simulated": r.get("simulated", False)}
     if not isinstance(out["simulated"], bool):
         raise ValueError("Invalid simulated flag")
     for k in keys - {"protocol", "phase", "simulated", "answer_sha256", "gpu_peaks"}:
@@ -288,7 +302,7 @@ class Library:
 
     def runs(self):
         with self.db() as db:
-            return [json.loads(r[0]) for r in db.execute("SELECT document FROM runs ORDER BY created DESC LIMIT 100")]
+            return [json.loads(r[0]) for r in db.execute("SELECT document FROM runs ORDER BY created DESC, rowid DESC LIMIT 100")]
 
     def save_run(self, run):
         with self.db() as db:
@@ -306,7 +320,9 @@ class Community:
         self.lock = threading.Lock()
         self.job = {"state": "idle"}
         self.cancel = threading.Event()
+        self.pause_requested = threading.Event()
         self.previous_spawn = None
+        self.active_id = self.previous_id = None
 
     def rig(self):
         m = self.svc.metrics()
@@ -339,7 +355,8 @@ class Community:
             job = copy.deepcopy(self.job)
         return {"configs": self.library.list(), "runs": self.library.runs(), "gpus": self.library.gpus(),
                 "rig": self.rig(), "runtime": self.runtime(), "model": self.svc.model, "platforms": PLATFORMS, "memory_architectures": MEMORY_ARCH, "settings": self.current(), "knobs": SCHEMA,
-                "job": job, "can_restore": self.previous_spawn is not None,
+                "job": job, "can_restore": self.previous_spawn is not None, "active_id": self.active_id,
+                "benchmarks": BENCHMARKS,
                 "simulated": not hasattr(self.svc.engine, "spawn"), "protocol": PROTOCOL, "ram_types": RAM_TYPES}
 
     def dispatch(self, action, req):
@@ -374,19 +391,35 @@ class Community:
                     doc.pop("runtime", None)
             doc["author"] = text(req.get("author", ""), "author", 40) or "Anonymous"
             return doc
-        if action == "cancel":
+        if action in ("cancel", "pause", "resume"):
             with self.lock:
                 if self.job.get("action") != "benchmark" or self.job["state"] != "running":
-                    raise ValueError("No running benchmark to cancel")
-            self.cancel.set()
+                    raise ValueError("No running benchmark")
+                if self.job.get("finishing"):
+                    raise ValueError("The benchmark is already restoring settings")
+                if action == "pause":
+                    self.pause_requested.set()
+                    self.job["pause_requested"] = True
+                elif action == "resume":
+                    self.pause_requested.clear()
+                    self.job["pause_requested"] = False
+                else:
+                    self.cancel.set()
             return {"ok": True}
-        if action in ("benchmark", "adopt", "restore"):
-            self.start(action, req.get("id"))
+        if action in ("benchmark", "adopt", "restore", "reload"):
+            self.start(action, req.get("id"), req.get("benchmark", "quick"))
             return {"ok": True}
         raise ValueError("Unknown community action")
 
-    def start(self, action, cid):
-        selected = self.library.get(cid) if action != "restore" else None
+    def start(self, action, cid, benchmark="quick"):
+        if action not in ("benchmark", "adopt", "restore", "reload"):
+            raise ValueError("Unknown engine action")
+        if not isinstance(benchmark, str) or benchmark not in BENCHMARKS:
+            raise ValueError("Choose a built-in benchmark")
+        ctx = self.svc.engine.max_context
+        if action == "benchmark" and ((benchmark == "context" and ctx < 16664) or (benchmark == "agent" and ctx < 10240)):
+            raise ValueError("The loaded model context is too small for this benchmark")
+        selected = self.library.get(cid) if action in ("benchmark", "adopt") else None
         if selected and selected["model"] != self.svc.model:
             raise ValueError("This bundle targets a different model; it cannot be applied")
         if getattr(self.svc.engine, "batch", 0) or hasattr(self.svc.engine, "replica_view"):
@@ -401,13 +434,27 @@ class Community:
             self.gate.release()
             raise ValueError("The server is busy")
         self.cancel.clear()
+        self.pause_requested.clear()
         with self.lock:
-            self.job = {"state": "running", "phase": "Preparing", "action": action, "config_id": cid}
-        threading.Thread(target=self._worker, args=(action, selected), daemon=True).start()
+            self.job = {"state": "running", "phase": "Preparing", "action": action, "config_id": cid,
+                        "benchmark": benchmark, "completed": 0, "total": BENCHMARKS[benchmark]["requests"] * 2,
+                        "started": now(), "paused": False, "pause_requested": False}
+        threading.Thread(target=self._worker, args=(action, selected, benchmark), daemon=True).start()
 
     def phase(self, message):
         with self.lock:
             self.job["phase"] = message
+
+    def checkpoint(self):
+        """Pause only between complete requests; never include pause time in a timing."""
+        while self.pause_requested.is_set() and not self.cancel.is_set():
+            with self.lock:
+                self.job["paused"] = True
+            self.cancel.wait(.1)
+        with self.lock:
+            self.job["paused"] = False
+        if self.cancel.is_set():
+            raise ValueError("Cancelled")
 
     def restart(self, spawn):
         if spawn is None:  # mock engine: integration tests, never a performance claim
@@ -417,7 +464,7 @@ class Community:
             self.svc.engine.spawn = copy.deepcopy(spawn)
             self.svc.engine.restart(tries=1)
 
-    def _worker(self, action, selected):
+    def _worker(self, action, selected, benchmark="quick"):
         original = copy.deepcopy(getattr(self.svc.engine, "spawn", None))
         original_idle = self.svc.idle_unload_s
         self.svc.idle_unload_s = 0
@@ -431,24 +478,38 @@ class Community:
             if action == "restore":
                 self.restart(self.previous_spawn)
                 self.previous_spawn = None
+                self.active_id, self.previous_id = self.previous_id, None
+            elif action == "reload":
+                self.phase("Reloading current model")
+                self.restart(original)
             elif action == "adopt":
                 self.phase("Applying settings (engine restart)")
                 self.restart(candidate)
-                if original is not None and self.previous_spawn is None:
+                if original is not None:
                     self.previous_spawn = original
+                    self.previous_id = self.active_id
+                self.active_id = selected["id"]
             else:
                 run = {"id": uuid.uuid4().hex, "config_id": selected["id"], "created": now(), "rig": self.rig(),
-                       "model": self.svc.model, "runtime": self.runtime(), "protocol": PROTOCOL, "baseline_settings": self.current(),
+                       "model": self.svc.model, "runtime": self.runtime(), "protocol": BENCHMARKS[benchmark]["protocol"],
+                       "benchmark": benchmark, "source": BENCHMARKS[benchmark]["source"], "passes": 1,
+                       "baseline_settings": self.current(),
                        "effective_settings": from_args(candidate[1]) if candidate else selected["settings"],
                        "baseline": [], "candidate": []}
                 for arm, spawn in (("baseline", original), ("candidate", candidate)):
-                    if self.cancel.is_set():
-                        raise ValueError("Cancelled")
+                    self.checkpoint()
                     self.phase(f"{arm}: restarting engine")
                     self.restart(spawn)
-                    for phase in ("cold", "warm"):
-                        self.phase(f"{arm}: {phase} prompt")
-                        run[arm].append(self.measure(phase))
+                    if benchmark == "quick":
+                        for phase in ("cold", "warm"):
+                            self.checkpoint()
+                            self.phase(f"{arm}: {phase} prompt")
+                            run[arm].append(self.measure(phase))
+                            with self.lock:
+                                self.job["completed"] += 1
+                    else:
+                        run[arm] = self.repository_suite(benchmark, arm, run["id"])
+                self.checkpoint()
                 self.library.save_run(run)
                 with self.lock:
                     self.job["run_id"] = run["id"]
@@ -459,6 +520,8 @@ class Community:
                 self.job["error"] = "Cancelled" if self.cancel.is_set() else f"Operation failed ({type(exc).__name__}); see server log."
             print(f"[community] {action} failed: {exc}", flush=True)
         finally:
+            with self.lock:
+                self.job.update(finishing=True, paused=False, pause_requested=False)
             if action == "benchmark" or not success:
                 self.phase("Restoring original settings")
                 try:
@@ -474,7 +537,47 @@ class Community:
                 self.job["phase"] = "Original settings restored" if action == "benchmark" and success else action
             self.gate.release()
 
+    def repository_suite(self, benchmark, arm, nonce):
+        # Execute the repository's actual Suite methods, not arbitrary user-supplied commands.
+        # Only the transport changes: the worker already holds the engine admission gate.
+        from tools.strata_bench import Suite
+        protocol = BENCHMARKS[benchmark]["protocol"]
+        phases = PROTOCOL_PHASES[protocol]
+        rows = []
+        recording = False
+
+        def request(base, key, messages, max_tokens, think=False, tools=None, **kwargs):
+            self.checkpoint()
+            label = phases[len(rows)] if recording else "warm-up (not measured)"
+            self.phase(f"{arm}: {label}")
+            row, response = self._measure_request(messages, max_tokens, tools or [])
+            if recording:
+                rows.append({**row, "protocol": protocol, "phase": label})
+                with self.lock:
+                    self.job["completed"] += 1
+            return response
+
+        suite = Suite("", "", self.svc.engine.max_context, 1, False, log=lambda message: None, request=request)
+        # Same tag and inputs in both arms; engine restart separates their caches.
+        suite.nonce = nonce
+        suite.warm_up()
+        recording = True
+        if benchmark == "chat":
+            suite.run_chat()
+        elif benchmark == "context":
+            suite.run_prompt(4096, "4K")
+            suite.run_prompt(16384, "16K")
+        else:
+            suite.agent_session(0)
+        if len(rows) != len(phases) or suite.out["failures"]:
+            raise ValueError("Repository benchmark did not complete every request")
+        return rows
+
     def measure(self, phase):
+        row, _ = self._measure_request([{"role": "user", "content": PROMPT}], 128, [])
+        return {**row, "protocol": PROTOCOL, "phase": phase}
+
+    def _measure_request(self, messages, max_tokens, tools):
         started, first, done = time.perf_counter(), None, None
         peaks = {"ram_peak_gib": None, "vram_peak_gib": None}
         gpu_peaks = {}
@@ -497,26 +600,37 @@ class Community:
         timer = threading.Timer(300, self.cancel.set)
         timer.start()
         answer = hashlib.sha256()
+        pieces = []
         try:
             req = {"temperature": 0, "top_p": 1, "top_k": 0, "min_p": 0, "seed": 42,
                    "reasoning_budget_tokens": 0, "experimental_speed_projection": False}
-            ids, thinking, cap = self.svc.prepare([{"role": "user", "content": PROMPT}], [],
-                                                  {"enable_thinking": False}, 128, req=req, cancel=self.cancel)
-            for kind, value in self.svc.run(ids, thinking, [], cap, req, self.cancel):
+            ids, thinking, cap = self.svc.prepare(messages, tools,
+                                                  {"enable_thinking": False}, max_tokens, req=req, cancel=self.cancel)
+            for kind, value in self.svc.run(ids, thinking, tools, cap, req, self.cancel):
                 if kind == "event" and getattr(value, "text", None):
                     if first is None:
                         first = time.perf_counter()
                     answer.update(value.text.encode())
+                    pieces.append(value.text)
                 elif kind == "done":
                     done = value
             if self.cancel.is_set() or done is None or first is None:
                 raise ValueError("No complete answer or benchmark cancelled")
             stop.set(); sampler.join(timeout=2)
             last = self.svc.history[-1] if self.svc.history else {}
-            return {"protocol": PROTOCOL, "phase": phase, "ttft_s": first - started,
+            elapsed = time.perf_counter() - started
+            timings = done.get("timings") or {}
+            row = {"ttft_s": first - started,
                     "decode_tok_s": last.get("decode_tok_s"), "output_tokens": done["completion_tokens"],
-                    "prompt_tokens": len(ids), "duration_s": time.perf_counter() - started, **peaks,
+                    "prompt_tokens": len(ids), "duration_s": elapsed, **peaks,
+                    "reused_tokens": timings.get("cache_n"), "read_tokens": timings.get("prompt_n"),
+                    "prompt_tok_s": timings.get("prompt_per_second"),
                     "gpu_peaks": [{"index": i, "peak_gib": value} for i, value in sorted(gpu_peaks.items())],
                     "answer_sha256": answer.hexdigest(), "simulated": not hasattr(self.svc.engine, "spawn")}
+            response = {"first": first - started, "total": elapsed, "text": "".join(pieces),
+                        "usage": {"prompt_tokens": len(ids), "completion_tokens": done["completion_tokens"],
+                                  "prompt_tokens_details": {"cached_tokens": timings.get("cache_n")}},
+                        "timings": timings, "err": None, "pieces": len(pieces)}
+            return row, response
         finally:
             timer.cancel(); stop.set(); sampler.join(timeout=2)

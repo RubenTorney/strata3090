@@ -22,3 +22,38 @@
 @media(max-width:600px){.co-filter-toggle{display:block}.co-filters:not(.co-expanded)>:not(:first-child):not(.co-filter-toggle){display:none}.co-filters>label:first-child{flex-basis:calc(100% - 100px);min-width:0}.co-heading{margin-bottom:16px}.co-rig{gap:12px;margin-bottom:14px}.co-rig>div:first-child .co-note{display:none}.co-heading p{font-size:13px}.co-results-head{margin-top:12px}}
 .co-detail .st-btn,.co-detail select{min-height:42px}
 @media(max-width:600px){.co-detail .co-actions>*{flex:none;width:100%;min-height:44px}.co-results-head .co-actions{margin-left:auto}.co-dialog{border-radius:16px}}
+
+/* Compact cards, immediate actions and visible feedback at every breakpoint. */
+.co-heading{margin-bottom:18px}.co-heading h1{font-size:clamp(25px,2.7vw,32px)}
+.co-rig{padding:16px 20px}.co-rig>div:first-child>.co-tag{justify-self:start}
+.co-card{gap:10px;padding:20px}.co-card .co-title-button{font-size:18px;overflow-wrap:anywhere}
+.co-gain{padding:12px 14px;gap:4px}.co-gain .co-result-source{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--st-ink-muted);margin-bottom:4px}
+.co-card-gpu{line-height:1.5;overflow-wrap:anywhere}.co-card-foot .st-btn{min-height:42px}
+.co-list--rows .co-card{grid-template-columns:85px minmax(160px,1fr) minmax(200px,1fr) minmax(190px,.9fr)}
+.co-inspector-head{display:flex;justify-content:space-between;align-items:center;gap:12px;position:sticky;top:-28px;padding:12px 0;background:var(--st-surface);z-index:2;border-bottom:1px solid var(--st-line);margin:-12px 0 20px}
+.co-eyebrow{font:11px var(--st-font-mono);letter-spacing:.09em;color:var(--st-ink-muted)}
+.co-description{font-size:14px;line-height:1.6;color:var(--st-ink-muted)}
+.co-detail .co-primary-actions{display:grid;grid-template-columns:1.2fr 1fr;margin-bottom:10px}
+.co-detail .co-library-actions{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;padding-top:14px;border-top:1px solid var(--st-line)}
+.co-library-actions .st-btn,.co-library-actions .st-input{font-size:12px;min-width:0;width:100%}
+.co-status{font-size:13px}.co-status button{flex-shrink:0}.co-status strong{display:inline-block;margin-bottom:5px}
+.co-method summary{cursor:pointer;font-size:12px;color:var(--st-ink-muted);margin-top:16px}
+#co-hardware-fields{border:0;padding:0;margin:0;min-width:0}#co-hardware-fields:disabled{opacity:.5}
+#view-community button:focus-visible,.co-dialog button:focus-visible,.co-dialog summary:focus-visible,.co-dialog select:focus-visible{outline:2px solid var(--st-accent);outline-offset:3px}
+.co-dialog h2{overflow-wrap:anywhere}.co-dialog label{line-height:1.5}
+@media(max-width:1020px){.co-list--rows .co-card{display:flex}}
+@media(max-width:600px){.co-inspector-head{top:-20px;margin:-8px 0 16px}.co-detail .co-primary-actions{grid-template-columns:1fr}.co-detail .co-library-actions{grid-template-columns:1fr 1fr}.co-status{align-items:flex-start;flex-wrap:wrap}.co-card{padding:18px}.co-more label{width:100%;margin-right:0}}
+
+/* Benchmark desk: one task at a time, zero-based charts, native accessible controls. */
+.co-session{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;margin:0 0 20px;padding:4px 0}.co-session>div:first-child{display:grid;gap:5px;min-width:0}.co-session strong{font-size:14px;overflow-wrap:anywhere}
+.co-workbench{width:min(960px,calc(100vw - 32px))}.co-workbench h2{margin:6px 0 0;font-size:25px}.co-workbench h3{margin:0;font-size:19px;overflow-wrap:anywhere}
+.bw-setup{display:grid;grid-template-columns:1fr 1fr;gap:16px}.co-workbench label{display:grid;gap:7px;min-width:0;font-size:12px;color:var(--st-ink-muted)}.co-workbench .st-input{width:100%;min-width:0}.bw-actions{margin:16px 0}.bw-actions .st-btn{min-height:42px}
+.bw-progress{background:var(--st-surface-2);border:1px solid var(--st-line);padding:16px;border-radius:var(--st-r-sm);font-size:13px}.bw-progress>div{display:flex;justify-content:space-between;gap:12px}.bw-progress progress{width:100%;height:8px;margin-top:12px;accent-color:var(--st-accent)}.bw-progress .co-note{margin-bottom:0}
+.bw-results{border-top:1px solid var(--st-line);margin-top:24px;padding-top:20px}.bw-results-head,.bw-report-title,.bw-chart-head{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}.bw-results-head{margin-bottom:24px}.bw-results-head label{flex:1;min-width:0}.bw-report-title .co-tag{font-size:10px}
+.bw-kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:20px 0}.bw-kpis>div{padding:16px;background:var(--st-surface-2);border-radius:var(--st-r-sm);display:grid;gap:5px}.bw-kpis strong{font:600 24px var(--st-font-mono);letter-spacing:-.03em}.bw-kpis span{font-size:11px;color:var(--st-ink-muted)}
+.bw-chart-head{align-items:flex-end;margin-bottom:16px}.bw-chart-head label{min-width:180px}.bw-legend{display:flex;gap:16px;flex-wrap:wrap;font-size:11px;color:var(--st-ink-muted)}.bw-legend span{display:flex;align-items:center;gap:6px}.bw-legend i{width:10px;height:10px;border-radius:3px}.bw-base{background:var(--st-ink-muted)}.bw-candidate{background:var(--st-accent)}
+.bw-chart-row{padding:12px 0;border-bottom:1px solid var(--st-line-soft)}.bw-chart-label{display:flex;justify-content:space-between;margin-bottom:8px;font-size:12px}.bw-chart-label strong{font-weight:500}.bw-bar-line{display:grid;grid-template-columns:minmax(0,1fr) 110px;align-items:center;gap:12px;margin:5px 0}.bw-bar-line>span{font:11px var(--st-font-mono);text-align:right}.bw-track{background:var(--st-surface-2);height:12px;border-radius:3px;overflow:hidden}.bw-bar{height:100%;border-radius:3px}
+.bw-table-scroll{overflow:auto}.co-workbench pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:11px;background:var(--st-surface-2);padding:12px;border-radius:8px}.co-workbench .co-method{margin-top:20px}
+.co-workbench .co-inspector-head>button{white-space:nowrap;flex-shrink:0}
+@media(max-width:400px){.co-workbench h2{font-size:20px}.co-workbench .co-inspector-head .co-eyebrow{display:none}}
+@media(max-width:600px){.co-session{gap:12px}.co-session .co-actions{width:100%;gap:8px}.co-session .st-btn{min-height:44px;font-size:12px}.co-workbench{padding:16px;width:calc(100vw - 20px)}.co-workbench .co-inspector-head{top:-16px}.bw-setup{grid-template-columns:1fr;gap:12px}.bw-kpis{gap:6px}.bw-kpis>div{padding:10px}.bw-kpis strong{font-size:18px}.bw-results-head{gap:10px}.bw-results-head label{flex-basis:100%}.bw-progress>div{flex-direction:column;gap:6px}.bw-chart-head{gap:12px}.bw-chart-head label{width:100%}.bw-bar-line{grid-template-columns:minmax(0,1fr) 96px;gap:8px}.bw-actions .st-btn{flex:1;font-size:12px}.bw-legend{gap:10px}}

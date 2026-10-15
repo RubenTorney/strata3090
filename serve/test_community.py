@@ -232,4 +232,79 @@ class AutoMetadataTests(HttpTests):
         with self.assertRaises(ValueError):bundle({**doc,'runtime':{'api_key':'x'}})
         with self.assertRaises(ValueError):bundle({**doc,'runtime':{'max_context':float('nan')}})
 
+
+class WorkbenchTests(unittest.TestCase):
+    setUp = HttpTests.setUp
+    request = HttpTests.request
+    wait = HttpTests.wait
+
+    def test_repository_scenarios_execute_and_export_their_actual_requests(self):
+        from tools.strata_bench import Suite
+        self.svc.engine.delay = 0
+        self.svc.engine.max_context = 200000  # byte tokenizer expands the agent's document fixtures
+        cid = self.svc.community.library.add(example())
+        for name, count in (("chat",3),("context",2),("agent",6)):
+            with self.subTest(name=name), patch('tools.strata_bench.chat',side_effect=AssertionError('no HTTP loopback')):
+                self.assertEqual(self.request('/community/benchmark',{'id':cid,'benchmark':name})[0],200)
+                s=self.wait();self.assertEqual(s['job']['state'],'done',s['job'])
+                run=s['runs'][0]
+                self.assertEqual(run['benchmark'],name)
+                self.assertEqual(len(run['baseline']),count);self.assertEqual(len(run['candidate']),count)
+                self.assertEqual(s['job']['completed'],count*2)
+                self.assertTrue(all(r['simulated'] for r in run['candidate']))
+                self.assertTrue(all(r['prompt_tokens']>0 for r in run['candidate']))
+                self.assertTrue(all(a['answer_sha256']==b['answer_sha256'] for a,b in zip(run['baseline'],run['candidate'])))
+                code,doc=self.request('/community/export',{'id':cid,'run_id':run['id']})
+                self.assertEqual(code,200);self.assertEqual(len(bundle(doc)['results']),count)
+        # Existing CLI callers retain their original HTTP transport.
+        from tools import strata_bench
+        self.assertIs(Suite('', '', 32768, 3, False).request,strata_bench.chat)
+
+    def test_pause_resume_cancel_and_mutation_gate(self):
+        c=self.svc.community;cid=c.library.add(example())
+        self.svc.engine.delay=.015
+        self.assertEqual(self.request('/community/pause',{})[0],400)
+        self.assertEqual(self.request('/community/benchmark',{'id':cid})[0],200)
+        self.assertEqual(self.request('/community/pause',{})[0],200)
+        end=time.monotonic()+3
+        while time.monotonic()<end and not c.job.get('paused'):time.sleep(.02)
+        self.assertTrue(c.job['paused'])
+        self.assertEqual(self.request('/community/reload',{})[0],400)
+        self.assertEqual(self.request('/v1/chat/completions',{})[0],409)
+        self.assertEqual(self.request('/community/resume',{})[0],200)
+        self.assertEqual(self.wait()['job']['state'],'done')
+        count=len(c.library.runs())
+        self.assertEqual(self.request('/community/benchmark',{'id':cid})[0],200)
+        self.request('/community/pause',{})
+        self.assertEqual(self.request('/community/cancel',{})[0],200)
+        self.assertEqual(self.wait()['job']['state'],'failed')
+        self.assertEqual(len(c.library.runs()),count)
+        self.assertTrue(c.gate.acquire(False));c.gate.release()
+
+    def test_catalog_is_bounded_and_context_is_checked_before_restart(self):
+        c=self.svc.community;cid=c.library.add(example())
+        with patch.object(c,'restart') as restart:
+            for value in ('../../tools/private.py','shell',{},'all'):
+                self.assertEqual(self.request('/community/benchmark',{'id':cid,'benchmark':value})[0],400)
+            self.svc.engine.max_context=4096
+            for name in ('context','agent'):
+                self.assertEqual(self.request('/community/benchmark',{'id':cid,'benchmark':name})[0],400)
+            restart.assert_not_called()
+        self.assertEqual(self.request('/community/reload',{})[0],200)
+        self.assertEqual(self.wait()['job']['state'],'done')
+
+    def test_undo_returns_to_immediately_previous_configuration(self):
+        c=self.svc.community
+        self.svc.engine.spawn=('/trusted/engine',['--spec','4'],'.',None,{},False,None)
+        a=c.library.add({**example(),'title':'A','settings':{'--spec':2}})
+        b=c.library.add({**example(),'title':'B','settings':{'--spec':3}})
+        with patch.object(self.svc.engine,'restart',create=True):
+            for cid in (a,b):
+                c.start('adopt',cid);self.assertEqual(self.wait()['job']['state'],'done')
+            self.assertEqual(c.current()['--spec'],3)
+            c.start('reload',None);self.wait();self.assertEqual(c.current()['--spec'],3)
+            c.start('restore',None);self.wait()
+            self.assertEqual(c.current()['--spec'],2);self.assertEqual(c.active_id,a)
+            self.assertFalse(c.state()['can_restore'])
+
 if __name__=='__main__':unittest.main()
